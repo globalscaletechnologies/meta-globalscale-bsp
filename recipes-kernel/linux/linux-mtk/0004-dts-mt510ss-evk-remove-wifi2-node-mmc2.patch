@@ -1,0 +1,185 @@
+From d1a1846b805fcfc41bd633655d7efd79504c5aa5 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 22 Aug 2024 15:38:17 +0800
+Subject: [PATCH] dts: mt510ss-evk: remove wifi2 node (mmc2)
+
+remove wifi2 node (mmc2) and related regulators
+---
+ .../boot/dts/mediatek/gti-mt510ss-evk.dts     | 136 +-----------------
+ 1 file changed, 5 insertions(+), 131 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+index f3fdfe3b4039..109856d42c57 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+@@ -180,24 +180,6 @@ VDD_3V3: VDD-3V3 {
+ 		regulator-always-on;
+ 	};
+ 
+-	sdio_fixed_3v3: regulator@2 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "sdio_card";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		enable-active-high;
+-		regulator-always-on;
+-	};
+-
+-	sdio_fixed_1v8: regulator@3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "sdio_io";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <1800000>;
+-		enable-active-high;
+-		regulator-always-on;
+-	};
+-
+ 	dsi0_en: dsi0-en {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "lcm1_en";
+@@ -635,14 +617,6 @@ pins-bus {
+ 		};
+ 	};
+ 
+-	rt1715_int: rt1715_int_pin {
+-		pins_cmd0_dat {
+-			pinmux = <PINMUX_GPIO12__FUNC_B_GPIO12>;
+-			bias-pull-up;
+-			input-enable;
+-		};
+-	};
+-
+ 	kpd_gpios_def_cfg: keypad-pins-default {
+ 		pins_kp {
+ 			pinmux = <PINMUX_GPIO44__FUNC_B1_KPROW0>,
+@@ -776,77 +750,6 @@ pins-clk {
+ 		};
+ 	};
+ 
+-	mmc2_pins_default: mmc2default {
+-		pins-clk {
+-			pinmux = <PINMUX_GPIO170__FUNC_B1_MSDC2_CLK>;
+-			drive-strength = <MTK_DRIVE_4mA>;
+-			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+-		};
+-
+-		pins-cmd-dat {
+-			pinmux = <PINMUX_GPIO169__FUNC_B1_MSDC2_CMD>,
+-				 <PINMUX_GPIO171__FUNC_B1_MSDC2_DAT0>,
+-				 <PINMUX_GPIO172__FUNC_B1_MSDC2_DAT1>,
+-				 <PINMUX_GPIO173__FUNC_B1_MSDC2_DAT2>,
+-				 <PINMUX_GPIO174__FUNC_B1_MSDC2_DAT3>;
+-			input-enable;
+-			drive-strength = <MTK_DRIVE_6mA>;
+-			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+-		};
+-
+-		pins-pcm {
+-			pinmux = <PINMUX_GPIO123__FUNC_O_PCM_DO>;
+-		};
+-
+-		wcn-3v3-en {
+-			pinmux = <PINMUX_GPIO74__FUNC_B_GPIO74>;
+-			output-high;
+-		};
+-	};
+-
+-	mmc2_pins_uhs: mmc2uhs {
+-		pins-clk {
+-			pinmux = <PINMUX_GPIO170__FUNC_B1_MSDC2_CLK>;
+-			drive-strength = <MTK_DRIVE_4mA>;
+-			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+-		};
+-
+-		pins-cmd-dat {
+-			pinmux = <PINMUX_GPIO169__FUNC_B1_MSDC2_CMD>,
+-				 <PINMUX_GPIO171__FUNC_B1_MSDC2_DAT0>,
+-				 <PINMUX_GPIO172__FUNC_B1_MSDC2_DAT1>,
+-				 <PINMUX_GPIO173__FUNC_B1_MSDC2_DAT2>,
+-				 <PINMUX_GPIO174__FUNC_B1_MSDC2_DAT3>;
+-			input-enable;
+-			drive-strength = <MTK_DRIVE_6mA>;
+-			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+-		};
+-	};
+-
+-	mmc2_pins_eint: dat1-eint {
+-		pins-dat1 {
+-			pinmux = <PINMUX_GPIO172__FUNC_B_GPIO172>;
+-			input-enable;
+-			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+-		};
+-	};
+-
+-	mmc2_pins_dat1: sdio-dat1 {
+-		pins-dat1 {
+-			pinmux = <PINMUX_GPIO172__FUNC_B1_MSDC2_DAT1>;
+-			input-enable;
+-			drive-strength = <MTK_DRIVE_6mA>;
+-			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+-		};
+-	};
+-
+-	wifi_pins_pwrseq: wifipwrseq {
+-		pins-wifi-enable {
+-			pinmux = <PINMUX_GPIO72__FUNC_B_GPIO72>;
+-			output-low;
+-		};
+-	};
+-
+ 	spi0_pins: spi0-pins {
+ 		pins-spi {
+ 			pinmux = <PINMUX_GPIO69__FUNC_O_SPIM0_CSB>,
+@@ -884,6 +787,11 @@ mux {
+ 				 <PINMUX_GPIO49__FUNC_B1_CLKREQN>;
+ 			bias-pull-up;
+ 		};
++
++		wcn-3v3-en {
++			pinmux = <PINMUX_GPIO74__FUNC_B_GPIO74>;
++			output-high;
++		};
+ 	};
+ 
+ 	usb_default: usbdefault {
+@@ -1212,40 +1120,6 @@ &mt6359_vsim1_ldo_reg {
+ 	regulator-enable-ramp-delay = <480>;
+ };
+ 
+-&wifi_pwrseq {
+-	status = "okay";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&wifi_pins_pwrseq>;
+-
+-	reset-gpios = <&pio 72 1>;
+-	post-power-on-delay-ms = <200>;
+-};
+-
+-&mmc2 {
+-	status = "okay";
+-	pinctrl-names = "default", "state_uhs", "state_eint",
+-					"state_dat1";
+-	pinctrl-0 = <&mmc2_pins_default>;
+-	pinctrl-1 = <&mmc2_pins_uhs>;
+-	pinctrl-2 = <&mmc2_pins_eint>;
+-	pinctrl-3 = <&mmc2_pins_dat1>;
+-	eint-gpios = <&pio 172 0>;
+-	bus-width = <4>;
+-	max-frequency = <200000000>;
+-	cap-sd-highspeed;
+-	sd-uhs-sdr104;
+-	keep-power-in-suspend;
+-	enable-sdio-wakeup;
+-	cap-sdio-async-int;
+-	cap-sdio-irq;
+-	no-mmc;
+-	no-sd;
+-	non-removable;
+-	vmmc-supply = <&sdio_fixed_3v3>;
+-	vqmmc-supply = <&sdio_fixed_1v8>;
+-	mmc-pwrseq = <&wifi_pwrseq>;
+-};
+-
+ &mt6359_vcn18_ldo_reg {
+ 	regulator-always-on;
+ };
