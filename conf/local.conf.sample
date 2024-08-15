@@ -335,3 +335,6 @@ KERNEL_DEVICETREE_OVERLAYS_AUTOLOAD:genio-700 += "gpu-mali.dtbo video.dtbo apusy
 KERNEL_DEVICETREE_OVERLAYS_AUTOLOAD:genio-510 += "gpu-mali.dtbo video.dtbo apusys.dtbo"
 KERNEL_DEVICETREE_OVERLAYS_AUTOLOAD:genio-1200 += "gpu-mali.dtbo video.dtbo apusys.dtbo"
 
+# The maximum number of build thread
+BB_NUMBER_THREADS = "2"
+PARALLEL_MAKE = "-j 2"
