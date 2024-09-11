@@ -1,0 +1,36 @@
+From b9f2b67d9baedfc1bd0c7297b02059bcaa6a1b5a Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Wed, 11 Sep 2024 13:39:51 +0800
+Subject: [PATCH] dts: gti-mt510ss-evk: fix incorrect shutdown pin for
+ IS31FL3199
+
+fix incorrect shutdown pin for IS31FL3199 LED driver
+---
+ arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+index 109856d42c57..631f6127bf99 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+@@ -445,7 +445,7 @@ pins-cmd-dat {
+ 
+ 	is31_sdb_pins: is31-sdb-pins {
+ 		pins-sdb {
+-			pinmux = <PINMUX_GPIO77__FUNC_B_GPIO77>;
++			pinmux = <PINMUX_GPIO73__FUNC_B_GPIO73>;
+ 			output-high;
+ 		};
+ 	};
+@@ -910,7 +910,7 @@ led_indicator: leds@64 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		reg = <0x64>;
+-		shutdown-gpios = <&pio 77 GPIO_ACTIVE_HIGH>;
++		shutdown-gpios = <&pio 73 GPIO_ACTIVE_HIGH>;
+ 
+ 		led1r: led@1 {
+ 			label = "led1:red";
+-- 
+2.34.1
+
