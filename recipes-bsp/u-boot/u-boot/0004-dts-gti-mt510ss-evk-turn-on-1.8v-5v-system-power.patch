@@ -1,0 +1,37 @@
+From 969769a44919016b25b025a0e191e97eed003dc6 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 12 Sep 2024 10:28:42 +0800
+Subject: [PATCH] dts: gti-mt510ss-evk: turn on 1.8v / 5v system power
+
+---
+ arch/arm/dts/gti-mt510ss-evk.dts | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/dts/gti-mt510ss-evk.dts b/arch/arm/dts/gti-mt510ss-evk.dts
+index 1ed76ca57f..5820e0866d 100644
+--- a/arch/arm/dts/gti-mt510ss-evk.dts
++++ b/arch/arm/dts/gti-mt510ss-evk.dts
+@@ -88,7 +88,19 @@
+ 		regulator-always-on;
+ 	};
+ 
+-    /* 3.3v power for wifi module */
++    /* 1.8v / 5v power for system */
++	vdd_1v8_5v: vdd-1v8-5v {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd-1v8-5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio 10 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	/* 3.3v power for wifi module */
+ 	wcn_3v3_en: wcn-3v3-en {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "wcn-3v3-en";
+-- 
+2.34.1
+
