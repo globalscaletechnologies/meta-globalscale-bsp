@@ -1,0 +1,35 @@
+From 4ded4c6b3763a00adf051bd4f3c76985eb935fad Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Fri, 13 Sep 2024 17:04:29 +0800
+Subject: [PATCH 1/2] Revert "dts: gti-mt510ss-evk: add Headphone L/R Ext Spk
+ Amp routing"
+
+This reverts commit 9726179e3e9951a9126b411f50a6ce0384c23e99.
+---
+ arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+index 631f6127bf99..4ae434e51ea6 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+@@ -1022,7 +1022,6 @@ &keypad {
+ &mt6359codec {
+ 	mediatek,mic-type-0 = <1>; /* ACC */
+ 	mediatek,mic-type-1 = <3>; /* DCC */
+-    ext-amp-enable = <&pio 13 GPIO_ACTIVE_HIGH>;
+ };
+ 
+ &mt6359_vbbck_ldo_reg {
+@@ -1313,8 +1312,6 @@ &sound {
+ 	audio-routing =
+ 		"Headphone", "Headphone L",
+ 		"Headphone", "Headphone R",
+-		"Headphone", "Headphone L Ext Spk Amp",
+-		"Headphone", "Headphone R Ext Spk Amp",
+ 		"AIN1", "Headset Mic",
+ 		"DMIC_INPUT", "AP DMIC",
+ 		"AP DMIC", "AUDGLB",
+-- 
+2.34.1
+
