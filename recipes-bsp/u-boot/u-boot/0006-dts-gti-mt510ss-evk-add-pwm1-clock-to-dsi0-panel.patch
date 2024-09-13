@@ -1,0 +1,27 @@
+From 2e5ddfb009e168e92ab703480d0a7456bb466250 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Fri, 13 Sep 2024 14:33:27 +0800
+Subject: [PATCH 2/2] dts: gti-mt510ss-evk: add pwm1 clock to dsi0 panel
+
+add missing pwm1 clock to dsi0 panel
+---
+ arch/arm/dts/gti-mt510ss-evk.dts | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/dts/gti-mt510ss-evk.dts b/arch/arm/dts/gti-mt510ss-evk.dts
+index b5a78fe972..5ba070f0ec 100644
+--- a/arch/arm/dts/gti-mt510ss-evk.dts
++++ b/arch/arm/dts/gti-mt510ss-evk.dts
+@@ -148,6 +148,9 @@
+ 		reset-gpios = <&gpio 25 GPIO_ACTIVE_HIGH>;
+ 		dcdc-gpios = <&gpio 45 GPIO_ACTIVE_HIGH>;
+ 		enable-gpios = <&pca9554 7 GPIO_ACTIVE_HIGH>;
++		clocks = <&topckgen CLK_TOP_DISP_PWM1>,
++				 <&infracfg_ao CLK_INFRA_AO_DISP_PWM1>;
++		clock-names = "main", "mm";
+ 		status = "okay";
+ 	};
+ };
+-- 
+2.34.1
+
