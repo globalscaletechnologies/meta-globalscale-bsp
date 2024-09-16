@@ -1,0 +1,42 @@
+From 97a13443f74b7af40172baddbb7981b6af30b178 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 16 Sep 2024 12:37:15 +0800
+Subject: [PATCH] dts: mt510ss-evk: change sdcard vmmc-supply to vmch_ext
+
+change sdcard vmmc-supply to external vmch_ext regulator
+---
+ arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+index 4ae434e51ea6..28dc64a5c399 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+@@ -187,6 +187,15 @@ dsi0_en: dsi0-en {
+ 		gpio = <&expander0 7 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
++	vmch_ext: vmch-ext {
++		compatible = "regulator-fixed";
++		regulator-name = "vmch_ext";
++		regulator-min-microvolt = <3100000>;
++		regulator-max-microvolt = <3100000>;
++		enable-active-high;
++		gpio = <&pio 4 GPIO_ACTIVE_HIGH>;
++	};
++
+ 	amic_codec: amic-codec {
+ 		#sound-dai-cells = <0>;
+ 		compatible = "dmic-codec";
+@@ -1107,7 +1116,7 @@ &mmc1 {
+ 	no-mmc;
+ 	no-sdio;
+ 	cd-gpios = <&pio 2 GPIO_ACTIVE_LOW>;
+-	vmmc-supply = <&mt6359_vpa_buck_reg>;
++	vmmc-supply = <&vmch_ext>;
+ 	vqmmc-supply = <&mt6359_vsim1_ldo_reg>;
+ };
+ 
+-- 
+2.34.1
+
