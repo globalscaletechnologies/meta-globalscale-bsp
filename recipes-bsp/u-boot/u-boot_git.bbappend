@@ -7,5 +7,6 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0004-dts-gti-mt510ss-evk-turn-on-1.8v-5v-system-power.patch \
     file://0005-dts-gti-mt510ss-evk-set-pca9554-as-gpio-controller.patch \
     file://0006-dts-gti-mt510ss-evk-add-pwm1-clock-to-dsi0-panel.patch \
+    file://0007-board-mt8370-turn-on-regulator-at-boot-if-regulator-.patch \
 "
 

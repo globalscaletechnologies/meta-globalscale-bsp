@@ -1,0 +1,37 @@
+From 48683d2f3bc6efd23a8fb6b2c6a7c392400658bb Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 16 Sep 2024 08:20:40 +0800
+Subject: [PATCH] board: mt8370: turn on regulator at boot if
+ 'regulator-boot-on' flag enabled
+
+---
+ board/mediatek/mt8370/mt8370_evk.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/board/mediatek/mt8370/mt8370_evk.c b/board/mediatek/mt8370/mt8370_evk.c
+index 49763aab10..3045a44f51 100644
+--- a/board/mediatek/mt8370/mt8370_evk.c
++++ b/board/mediatek/mt8370/mt8370_evk.c
+@@ -11,6 +11,7 @@
+ #include <asm/io.h>
+ #include <linux/kernel.h>
+ #include <linux/arm-smccc.h>
++#include <power/regulator.h>
+ #include <iot_ab.h>
+ 
+ #define MT8370_UPDATABLE_IMAGES	5
+@@ -125,6 +126,11 @@ int board_init(void)
+ 	struct udevice *dev;
+ 	int ret;
+ 
++	/* turn on regulator at boot if 'regulator-boot-on' flag enabled */
++	if (IS_ENABLED(CONFIG_DM_REGULATOR) && board_is_gti_mt510ss_evk()) {
++		regulators_enable_boot_on(_DEBUG);
++	}
++
+ 	if (CONFIG_IS_ENABLED(USB_GADGET)) {
+ 		ret = uclass_get_device(UCLASS_USB_GADGET_GENERIC, 0, &dev);
+ 		if (ret) {
+-- 
+2.34.1
+
