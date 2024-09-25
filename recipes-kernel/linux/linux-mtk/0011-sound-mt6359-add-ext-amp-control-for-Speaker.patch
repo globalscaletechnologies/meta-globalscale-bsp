@@ -1,0 +1,109 @@
+From a322f190b9013da1234b6743e596e48842d598cd Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 23 Sep 2024 17:04:00 +0800
+Subject: [PATCH 3/5] sound: mt6359: add ext-amp control for Speaker
+
+add ext-amp control for Speaker and also add related dapm widget / routing
+---
+ sound/soc/codecs/mt6359.c | 44 +++++++++++++++++++++++++++++++++++++++
+ sound/soc/codecs/mt6359.h |  1 +
+ 2 files changed, 45 insertions(+)
+
+diff --git a/sound/soc/codecs/mt6359.c b/sound/soc/codecs/mt6359.c
+index 0a87b6e1a727..d08ab807967f 100644
+--- a/sound/soc/codecs/mt6359.c
++++ b/sound/soc/codecs/mt6359.c
+@@ -10,6 +10,7 @@
+ #include <linux/mfd/mt6397/core.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
++#include <linux/of_gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/sched.h>
+@@ -1964,6 +1965,30 @@ static int mt_ncp_event(struct snd_soc_dapm_widget *w,
+ 	return 0;
+ }
+ 
++static int spk_event(struct snd_soc_dapm_widget *w,
++				 struct snd_kcontrol *kcontrol, int event)
++{
++	struct snd_soc_component *cmpnt = snd_soc_dapm_to_component(w->dapm);
++	struct mt6359_priv *priv = snd_soc_component_get_drvdata(cmpnt);
++
++	switch (event) {
++	case SND_SOC_DAPM_PRE_PMU:
++		// turn on the amplifier
++		if (priv->amp_gpio != -1) {
++			gpio_set_value(priv->amp_gpio, 1);
++		}
++		break;
++	case SND_SOC_DAPM_POST_PMD:
++		// turn off the amplifier
++		if (priv->amp_gpio != -1) {
++			gpio_set_value(priv->amp_gpio, 0);
++		}
++		break;
++	}
++
++	return 0;
++}
++
+ /* DAPM Widgets */
+ static const struct snd_soc_dapm_widget mt6359_dapm_widgets[] = {
+ 	/* Global Supply*/
+@@ -2135,6 +2160,10 @@ static const struct snd_soc_dapm_widget mt6359_dapm_widgets[] = {
+ 			   mt_lo_event,
+ 			   SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_PRE_PMD),
+ 
++	/* SPK */
++	SND_SOC_DAPM_SPK("Speaker L", spk_event),
++	SND_SOC_DAPM_SPK("Speaker R", spk_event),
++
+ 	/* Outputs */
+ 	SND_SOC_DAPM_OUTPUT("Receiver"),
+ 	SND_SOC_DAPM_OUTPUT("Headphone L"),
+@@ -2545,6 +2574,9 @@ static const struct snd_soc_dapm_route mt6359_dapm_routes[] = {
+ 	{"Headphone L Ext Spk Amp", NULL, "HP Mux"},
+ 	{"Headphone R Ext Spk Amp", NULL, "HP Mux"},
+ 
++	{"Speaker L", NULL, "Headphone L"},
++	{"Speaker R", NULL, "Headphone R"},
++
+ 	/* Receiver Path */
+ 	{"RCV Mux", "Voice Playback", "DACL"},
+ 	{"Receiver", NULL, "RCV Mux"},
+@@ -2815,6 +2847,18 @@ static int mt6359_parse_dt(struct mt6359_priv *priv)
+ 		priv->mux_select[MUX_MIC_TYPE_2] = MIC_TYPE_MUX_IDLE;
+ 	}
+ 
++	priv->amp_gpio = of_get_named_gpio(np, "amp-gpio", 0);
++	if (gpio_is_valid(priv->amp_gpio)) {
++		ret = devm_gpio_request_one(priv->dev, priv->amp_gpio,
++					GPIOF_OUT_INIT_LOW, "amp-gpio");
++		if (ret < 0) {
++			priv->amp_gpio = -1;
++		}
++	} else {
++		dev_info(priv->dev,
++			 "%s() failed to read amp-gpio, ignore.\n", __func__);
++	}
++
+ 	return 0;
+ }
+ 
+diff --git a/sound/soc/codecs/mt6359.h b/sound/soc/codecs/mt6359.h
+index 296ffa7f50b5..8ce7cb1eda28 100644
+--- a/sound/soc/codecs/mt6359.h
++++ b/sound/soc/codecs/mt6359.h
+@@ -4272,6 +4272,7 @@ struct mt6359_priv {
+ 	int hp_gain_ctl;
+ 	int hp_hifi_mode;
+ 	int mtkaif_protocol;
++	int amp_gpio;
+ };
+ 
+ #define CODEC_MT6359_NAME "mtk-codec-mt6359"
+-- 
+2.34.1
+

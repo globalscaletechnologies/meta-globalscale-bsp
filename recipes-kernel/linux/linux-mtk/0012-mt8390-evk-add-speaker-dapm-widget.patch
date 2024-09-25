@@ -1,0 +1,25 @@
+From 494bf7668be1910b65f225ab4081fe3b620d1f1f Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Wed, 25 Sep 2024 13:48:56 +0800
+Subject: [PATCH 4/5] mt8390-evk: add speaker dapm widget
+
+add speaker dapm widget 'Speaker'
+---
+ sound/soc/mediatek/mt8188/mt8390-evk.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/sound/soc/mediatek/mt8188/mt8390-evk.c b/sound/soc/mediatek/mt8188/mt8390-evk.c
+index ade8fcfadd8e..f6ab53a438ff 100644
+--- a/sound/soc/mediatek/mt8188/mt8390-evk.c
++++ b/sound/soc/mediatek/mt8188/mt8390-evk.c
+@@ -55,6 +55,7 @@ static struct snd_soc_jack_pin mt8188_dp_jack_pins[] = {
+ static const struct snd_soc_dapm_widget
+ 	mt8188_mt6359_widgets[] = {
+ 	SND_SOC_DAPM_HP("Headphone", NULL),
++	SND_SOC_DAPM_SPK("Speaker", NULL),
+ 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+ 	SND_SOC_DAPM_MIC("AP DMIC", NULL),
+ 	SND_SOC_DAPM_SINK("HDMI"),
+-- 
+2.34.1
+

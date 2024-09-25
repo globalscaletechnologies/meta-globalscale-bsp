@@ -8,6 +8,11 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0005-dts-gti-mt510ss-evk-fix-incorrect-shutdown-pin-for-I.patch \
     file://0007-Revert-sound-codec-mt6359-add-external-amp-gpio.patch \
     file://0008-dts-mt510ss-evk-change-sdcard-vmmc-supply-to-vmch_ex.patch \
+    file://0009-dts-gti-mt510ss-evk-enable-DP-3.3v-power.patch \
+    file://0010-dts-gti-mt510ss-evk-add-5G-modem-power-on-regulator.patch \
+    file://0011-sound-mt6359-add-ext-amp-control-for-Speaker.patch \
+    file://0012-mt8390-evk-add-speaker-dapm-widget.patch \
+    file://0013-dts-gti-mt510ss-evk-add-external-amplifier-control-f.patch \
 "
 
 # Board specific config fragments
