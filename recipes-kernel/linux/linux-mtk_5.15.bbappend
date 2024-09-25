@@ -6,6 +6,7 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0003-dts-gti-mt510ss-evk-add-Headphone-L-R-Ext-Spk-Amp-ro.patch \
     file://0004-dts-mt510ss-evk-remove-wifi2-node-mmc2.patch \
     file://0005-dts-gti-mt510ss-evk-fix-incorrect-shutdown-pin-for-I.patch \
+    file://0006-Revert-dts-gti-mt510ss-evk-add-Headphone-L-R-Ext-Spk.patch \
     file://0007-Revert-sound-codec-mt6359-add-external-amp-gpio.patch \
     file://0008-dts-mt510ss-evk-change-sdcard-vmmc-supply-to-vmch_ex.patch \
     file://0009-dts-gti-mt510ss-evk-enable-DP-3.3v-power.patch \
