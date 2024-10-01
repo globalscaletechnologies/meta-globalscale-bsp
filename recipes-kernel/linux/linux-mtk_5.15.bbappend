@@ -15,6 +15,7 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0012-mt8390-evk-add-speaker-dapm-widget.patch \
     file://0013-dts-gti-mt510ss-evk-add-external-amplifier-control-f.patch \
     file://0014-drm-mtk_dp-support-DisplayPort-direct-output.patch \
+    file://0015-linux-mtk-mtk-dp-remove-verbose-message.patch \
 "
 
 # Board specific config fragments

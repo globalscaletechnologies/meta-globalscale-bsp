@@ -1,0 +1,28 @@
+From 3c40db7530a0e5f5bbe5d7b2cdfdc0591736ab06 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Tue, 1 Oct 2024 11:52:02 +0800
+Subject: [PATCH] linux-mtk: mtk-dp: remove verbose message
+
+---
+ drivers/gpu/drm/mediatek/mtk_dp.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_dp.c b/drivers/gpu/drm/mediatek/mtk_dp.c
+index cea4ab0f24b2..d2f9e915c3a3 100755
+--- a/drivers/gpu/drm/mediatek/mtk_dp.c
++++ b/drivers/gpu/drm/mediatek/mtk_dp.c
+@@ -2843,9 +2843,11 @@ static int mtk_dp_bridge_atomic_check(struct drm_bridge *bridge,
+ 
+ 	input_bus_format = bridge_state->input_bus_cfg.format;
+ 
++#if 0
+ 	dev_info(mtk_dp->dev, "input format 0x%04x, output format 0x%04x\n",
+ 		 bridge_state->input_bus_cfg.format,
+ 		 bridge_state->output_bus_cfg.format);
++#endif
+ 
+ 	mtk_dp->input_fmt = input_bus_format;
+ 	if (mtk_dp->input_fmt == MEDIA_BUS_FMT_YUYV8_1X16)
+-- 
+2.34.1
+
