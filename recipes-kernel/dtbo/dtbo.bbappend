@@ -14,4 +14,6 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
 	file://camera-imx214-csi0.dts \
 	file://camera-imx214-2lanes-csi0.dts \
 	file://audio-sof.dts \
+	file://uart-rs232.dts \
+	file://uart-rs485.dts \
 "
