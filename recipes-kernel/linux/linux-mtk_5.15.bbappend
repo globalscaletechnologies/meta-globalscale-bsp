@@ -17,6 +17,7 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0014-drm-mtk_dp-support-DisplayPort-direct-output.patch \
     file://0015-linux-mtk-mtk-dp-remove-verbose-message.patch \
     file://0016-USB-serial-option-add-Quectel-RM520N.patch \
+    file://0017-net-usb-qmi_wwan-add-Quectel-RM520N.patch \
 "
 
 # Board specific config fragments
