@@ -1,0 +1,28 @@
+From ec44e8c1bd5a1c639fcfae4dc519fbfd7872e940 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Tue, 8 Oct 2024 09:17:32 +0800
+Subject: [PATCH 2/3] dts: gti-mt510ss-evk: modify audio routing name
+
+modify audio routing name from Speaker L/R to Ext Spk L/R
+---
+ arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+index 4290d97ead26..9be16b831377 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
+@@ -1362,8 +1362,8 @@ &sound {
+ 	audio-routing =
+ 		"Headphone", "Headphone L",
+ 		"Headphone", "Headphone R",
+-		"Speaker", "Speaker L",
+-		"Speaker", "Speaker R",
++		"Speaker", "Ext Spk L",
++		"Speaker", "Ext Spk R",
+ 		"AIN1", "Headset Mic",
+ 		"DMIC_INPUT", "AP DMIC",
+ 		"AP DMIC", "AUDGLB",
+-- 
+2.34.1
+
