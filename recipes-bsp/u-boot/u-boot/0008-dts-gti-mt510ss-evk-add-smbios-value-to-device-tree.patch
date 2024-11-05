@@ -1,0 +1,42 @@
+From 4964eecaf59a106a42c69fb6f28a248ebd8b2c0b Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Tue, 5 Nov 2024 13:58:08 +0800
+Subject: [PATCH 1/2] dts: gti-mt510ss-evk: add smbios value to device tree
+
+add smbios value to device tree
+---
+ arch/arm/dts/gti-mt510ss-evk.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/dts/gti-mt510ss-evk.dts b/arch/arm/dts/gti-mt510ss-evk.dts
+index 5ba070f0ec..c6064d9f79 100644
+--- a/arch/arm/dts/gti-mt510ss-evk.dts
++++ b/arch/arm/dts/gti-mt510ss-evk.dts
+@@ -15,6 +15,24 @@
+ 				 "mediatek,genio-510-evk",
+ 				 "mediatek,mt8370";
+ 
++	sysinfo {
++		compatible = "u-boot,sysinfo-smbios";
++		smbios {
++			system {
++				manufacturer = "Globalscale Technologies Inc.";
++				product = "MT510SS-EVK";
++			};
++			baseboard {
++				manufacturer = "Globalscale Technologies Inc.";
++				product = "MT510SS-EVK";
++			};
++			chassis {
++				manufacturer = "Globalscale Technologies Inc.";
++				product = "MT510SS-EVK";
++			};
++		};
++	};
++
+ 	memory@40000000 {
+ 		/* 4GB */
+ 		device_type = "memory";
+-- 
+2.34.1
+
