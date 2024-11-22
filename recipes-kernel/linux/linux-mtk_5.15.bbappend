@@ -21,6 +21,7 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0018-sound-codec-mt6359-add-Spk-Mux-for-Ext-Spaker.patch \
     file://0019-dts-gti-mt510ss-evk-modify-audio-routing-name.patch \
     file://0020-linux-mtk-mtk_dp-change-mtk_dp.c-file-attribute.patch \
+    file://0021-dts-gti-mt510ss-evk-change-uart2-pins-to-GPIO-79-80-.patch \
 "
 
 # Board specific config fragments
