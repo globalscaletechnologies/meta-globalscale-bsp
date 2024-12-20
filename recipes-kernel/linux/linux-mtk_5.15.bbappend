@@ -23,6 +23,7 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0020-linux-mtk-mtk_dp-change-mtk_dp.c-file-attribute.patch \
     file://0021-dts-gti-mt510ss-evk-change-uart2-pins-to-GPIO-79-80-.patch \
     file://0022-dts-gti-mt510ss-evk-fix-uart2-and-spi2-pinmux-confli.patch \
+    file://0023-net-ax88179-restrict-the-AX88179-to-support-only-ver.patch \
 "
 
 # Board specific config fragments
