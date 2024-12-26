@@ -1,0 +1,28 @@
+From 59120a8d9de23450fdd3b6dd9c739fde323f094a Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 26 Dec 2024 11:33:16 +0800
+Subject: [PATCH] mt8370: add delay time to prevent lcd flicker
+
+---
+ board/mediatek/mt8370/mt8370_evk_panel.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/board/mediatek/mt8370/mt8370_evk_panel.c b/board/mediatek/mt8370/mt8370_evk_panel.c
+index 2a7a467c72..474d587f3e 100644
+--- a/board/mediatek/mt8370/mt8370_evk_panel.c
++++ b/board/mediatek/mt8370/mt8370_evk_panel.c
+@@ -154,8 +154,10 @@ static void startek_kd070fhfid078_power_off(void)
+ 
+ 	panel_get_desc(&panel_desc);
+ 
+-	if (dm_gpio_is_valid(&panel_desc->enable_gpio))
++	if (dm_gpio_is_valid(&panel_desc->enable_gpio)) {
+ 		dm_gpio_set_value(&panel_desc->enable_gpio, 0);
++		mdelay(10);
++	}
+ 	if (dm_gpio_is_valid(&panel_desc->reset_gpio)) {
+ 		dm_gpio_set_value(&panel_desc->reset_gpio, 0);
+ 		mdelay(15);
+-- 
+2.34.1
+

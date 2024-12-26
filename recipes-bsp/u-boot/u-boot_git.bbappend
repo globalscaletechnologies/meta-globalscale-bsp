@@ -10,5 +10,6 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0007-board-mt8370-turn-on-regulator-at-boot-if-regulator-.patch \
     file://0008-dts-gti-mt510ss-evk-add-smbios-value-to-device-tree.patch \
     file://0009-config-mt510ss_evk-enable-sysinfo-feature.patch \
+    file://0010-mt8370-add-delay-time-to-prevent-lcd-flicker.patch \
 "
 
