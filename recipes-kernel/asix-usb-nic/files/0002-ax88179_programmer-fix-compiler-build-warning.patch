@@ -1,4 +1,4 @@
-From 367a9b47060b45c5aa34c16ccd137dc13c3e1669 Mon Sep 17 00:00:00 2001
+From 7526709d462b1c88777507261804f4c6aebf0048 Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
 Date: Mon, 12 Aug 2024 10:24:21 +0800
 Subject: [PATCH 2/2] ax88179_programmer: fix compiler build warning
@@ -8,7 +8,7 @@ Subject: [PATCH 2/2] ax88179_programmer: fix compiler build warning
  1 file changed, 10 insertions(+), 4 deletions(-)
 
 diff --git a/ax88179_programmer.c b/ax88179_programmer.c
-index 8bf1d3a..0a1abe9 100755
+index 4990918..83b7d0f 100755
 --- a/ax88179_programmer.c
 +++ b/ax88179_programmer.c
 @@ -322,8 +322,8 @@ static int writeeeprom_func(struct ax_command_info *info)
@@ -54,5 +54,5 @@ index 8bf1d3a..0a1abe9 100755
  	} else {
  		ioctl_cmd.ioctl_cmd = AX88179_READ_EEPROM;
 -- 
-2.34.1
+2.47.1
 

@@ -1,4 +1,4 @@
-require asix-usb-nic.inc
+require asix-usb-nic_3.4.0.inc
 
 SRC_URI += " \
     file://0001-makefile-split-utils-module-and-_install-from-makefi.patch \
