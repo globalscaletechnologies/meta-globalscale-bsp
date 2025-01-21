@@ -11,5 +11,7 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0008-dts-gti-mt510ss-evk-add-smbios-value-to-device-tree.patch \
     file://0009-config-mt510ss_evk-enable-sysinfo-feature.patch \
     file://0010-mt8370-add-delay-time-to-prevent-lcd-flicker.patch \
+    file://0011-mediatek-mt8188-query-onboard-dram-memory-size.patch \
+    file://0012-board-mt8370-fixup-device-tree-memory-size.patch \
 "
 
