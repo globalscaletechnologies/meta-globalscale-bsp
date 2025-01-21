@@ -13,5 +13,7 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0010-mt8370-add-delay-time-to-prevent-lcd-flicker.patch \
     file://0011-mediatek-mt8188-query-onboard-dram-memory-size.patch \
     file://0012-board-mt8370-fixup-device-tree-memory-size.patch \
+    file://0013-cmd-axprog-Asix-USB-to-Ethernet-EEPROM-programming-u.patch \
+    file://0014-configs-mt510ss-enable-asix-usb-to-ethernet-eeprom-p.patch \
 "
 

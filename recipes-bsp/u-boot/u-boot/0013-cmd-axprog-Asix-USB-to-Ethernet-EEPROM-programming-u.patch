@@ -1,0 +1,1357 @@
+From 7fb3d78d3a522d5b93470f7f5865d77b8657f671 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Tue, 21 Jan 2025 09:59:54 +0800
+Subject: [PATCH 3/4] cmd: axprog" Asix USB-to-Ethernet EEPROM programming
+ utility
+
+This command allows users to configure and manage the MAC address
+and other parameters stored in the ASIX's EEPROM.
+The utility can be used to read, write, and validate EEPROM data.
+---
+ cmd/Kconfig         |   12 +
+ cmd/Makefile        |    1 +
+ cmd/ax_programmer.c | 1297 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 1310 insertions(+)
+ create mode 100644 cmd/ax_programmer.c
+
+diff --git a/cmd/Kconfig b/cmd/Kconfig
+index 869804ab09..96e96c46eb 100644
+--- a/cmd/Kconfig
++++ b/cmd/Kconfig
+@@ -2128,6 +2128,18 @@ config CMD_UUID
+ 	  The two commands are very similar except for the endianness of the
+ 	  output.
+ 
++config CMD_AX_PROGRAMMER
++	bool "ASIX USB-to-Ethernet EEPROM programming utility"
++	help
++	  Enable support for the ASIX USB-ETH EEPROM utility command.
++
++	  This command allows users to configure and manage the MAC address
++	  and other parameters stored in the ASIX's EEPROM. The utility
++	  can be used to read, write, and validate EEPROM data.
++
++	  Enable this option if your system uses the ASIX USB-to-Ethernet
++	  controller and you need tools to manage its EEPROM.
++
+ endmenu
+ 
+ source "cmd/ti/Kconfig"
+diff --git a/cmd/Makefile b/cmd/Makefile
+index db513d21c1..68013f53a1 100644
+--- a/cmd/Makefile
++++ b/cmd/Makefile
+@@ -177,6 +177,7 @@ obj-$(CONFIG_CMD_UFS) += ufs.o
+ obj-$(CONFIG_CMD_USB) += usb.o disk.o
+ obj-$(CONFIG_CMD_FASTBOOT) += fastboot.o
+ obj-$(CONFIG_CMD_FS_UUID) += fs_uuid.o
++obj-$(CONFIG_CMD_AX_PROGRAMMER) += ax_programmer.o
+ 
+ obj-$(CONFIG_CMD_USB_MASS_STORAGE) += usb_mass_storage.o
+ obj-$(CONFIG_CMD_USB_SDP) += usb_gadget_sdp.o
+diff --git a/cmd/ax_programmer.c b/cmd/ax_programmer.c
+new file mode 100644
+index 0000000000..1ca463b2b1
+--- /dev/null
++++ b/cmd/ax_programmer.c
+@@ -0,0 +1,1297 @@
++#include <common.h>
++#include <command.h>
++#include <dm.h>
++#include <errno.h>
++#include <log.h>
++#include <malloc.h>
++#include <memalign.h>
++#include <mapmem.h>
++#include <net.h>
++#include <usb.h>
++#include <fs.h>
++#ifdef CONFIG_BLK
++#include <blk.h>
++#endif
++
++#include <asm/cache.h>
++#include <linux/delay.h>
++#include <linux/usb/ch9.h>
++#include <linux/ctype.h>
++
++#define ENABLE_AX88279
++//#define FLASH_DEBUG_DUMP
++#define AX88279_USB_VID					0x0B95
++#define AX88279_USB_PID					0x1790
++
++/* Timeouts */
++#define USB_CTRL_SET_TIMEOUT_MS			5000
++#define USB_CTRL_GET_TIMEOUT_MS			5000
++#define USB_BULK_SEND_TIMEOUT_MS		5000
++#define USB_BULK_RECV_TIMEOUT_MS		5000
++#define RELOAD_DELAY_TIME				10	// sec
++
++#define EEPROM_SIZE						0x3100
++#define MAC_ADDR_LEN					6
++#define FLASH_BLOCK_SIZE				20 //bytes
++#define WRITE_PARA_HEADER				0x2100
++#define FLASH_SIZE						(2 * 1024 * 1024)
++#define FLASH_PARA_OFFSET				8448
++
++#define PRAM_PRI_FW1_OFFSET				0x0
++#define PRAM_PRI_FW1_LENGTH				0x4
++#define MD32_PRI_FW1_OFFSET				0x14
++#define MD32_PRI_FW1_LENGTH				0x18
++
++#define PRAM_SEC_FW1_OFFSET				0x28
++#define PRAM_SEC_FW1_LENGTH				0x2C
++#define MD32_SEC_FW1_OFFSET				0x3C
++#define MD32_SEC_FW1_LENGTH				0x40
++
++#define PRAM_PRI_FW2_OFFSET				0x1000
++#define PRAM_PRI_FW2_LENGTH				0x1004
++#define MD32_PRI_FW2_OFFSET				0x1014
++#define MD32_PRI_FW2_LENGTH				0x1018
++
++#define PRAM_SEC_FW2_OFFSET				0x1028
++#define PRAM_SEC_FW2_LENGTH				0x102C
++#define MD32_SEC_FW2_OFFSET				0x103C
++#define MD32_SEC_FW2_LENGTH				0x1040
++
++#define PARAMETER_PRI_HEADER_OFFSET		0x2000
++#define PARAMETER_SEC_HEADER_OFFSET		0x200C
++
++#define PARAMETER_PRI_OFFSET			0x2004
++#define PARAMETER_PRI_BLOCK_COUNT		0x2008
++#define PARAMETER_SEC_OFFSET			0x2010
++#define PARAMETER_SEC_BLOCK_COUNT		0x2014
++
++#define AX_ACCESS_MAC					0x01
++#define AX_ACCESS_PHY					0x02
++#define AX_ACCESS_WAKEUP				0x03
++#define AX_ACCESS_EEPROM				0x04
++#define AX_ACCESS_EFUSE					0x05
++#define AX_RELOAD_EEPROM_EFUSE			0x06
++#define AX_RELOAD_FLASH_EFUSE			0x06
++#define AX_FW_MODE						0x08
++	#define AX_FW_MODE_179A				0x0001
++	#define AX_USB_EP5_EN				0x0001
++#ifdef ENABLE_AX88279
++#ifdef ENABLE_PTP_FUNC
++	#define AX_USB_EP4_EN				0x0002
++#endif
++#endif
++#define AX_WRITE_EFUSE_EN				0x09
++#define AX_WRITE_EFUSE_DIS				0x0A
++#define AX_ACCESS_MFAB					0x10
++#define AX_PHY_POLLING					0x90
++#define PHYSICAL_LINK_STATUS			0x02
++	#define	AX_USB_SS					0x04
++	#define	AX_USB_HS					0x02
++	#define	AX_USB_FS					0x01
++#define GENERAL_STATUS					0x03
++	#define	AX_SECLD					0x04
++#define AX_CHIP_STATUS					0x05
++	#define AX_CHIP_CODE_MASK			0x70
++	#define CHIP_CODE(x)				((x & AX_CHIP_CODE_MASK) >> 4)
++#define AX_SROM_ADDR					0x07
++#define AX_SROM_CMD						0x0a
++	#define EEP_RD						0x04
++	#define EEP_WR						0x08
++	#define EEP_BUSY					0x10
++#define AX_SROM_DATA_LOW				0x08
++#define AX_SROM_DATA_HIGH				0x09
++#define AX_RX_CTL						0x0b
++#define AX_RX_CTL_HI					0x0c
++	#define AX_RX_CTL_DROPCRCERR_HI		0x01
++	#define AX_RX_CTL_DROPCRCERR		0x0100
++	#define AX_RX_CTL_IPE				0x0200
++	#define AX_RX_CTL_TXPADCRC			0x0400
++	#define AX_RX_CTL_START				0x0080
++	#define AX_RX_CTL_AP				0x0020
++	#define AX_RX_CTL_AM				0x0010
++	#define AX_RX_CTL_AB				0x0008
++	#define AX_RX_CTL_HA8B				0x0004
++	#define AX_RX_CTL_AMALL				0x0002
++	#define AX_RX_CTL_PRO				0x0001
++	#define AX_RX_CTL_STOP				0x0000
++#define AX_NODE_ID						0x10
++
++
++#define AX88179A_BIN_TIMER_UINT			800		//ns
++
++#define AX88179A_NAPI_WEIGHT			64
++#ifdef ENABLE_AX88279
++#define AX88279_NAPI_WEIGHT				256
++#endif
++#define AX88179A_BUF_RX_SIZE			(48 * 1024)
++#ifdef ENABLE_AX88279
++#define AX88279_BUF_RX_SIZE				(48 * 1024)
++#endif
++#define AX88179A_PHY_ID					0x03
++#define AX88179_GPHY_CTRL				0x0F
++	#define AX_GPHY_EEE_CTRL			0x01
++#define AX88179A_HIGH_QUEUE_POINT		0x60
++#ifdef ENABLE_AX88279
++#define AX88279_HIGH_QUEUE_POINT		0x70
++#endif
++#define AX88179A_AUTODETACH_DELAY		(5UL << 8)
++
++#define AX8179A_WAKEUP_SETTING			0x07
++#define AX88179A_PBUS_REG				0x10
++#define AX88179A_ACCESS_BL				0x2A
++#define AX88179A_PHY_CLAUSE45			0x27
++#define AX88179A_PHY_POWER				0x31
++	#define AX_PHY_POWER				0x02
++#define AX88179A_USB_DC					0x81
++#define AX88179A_BOOT_TO_ROM			0x9F
++#define AX88179A_AUTODETACH				0xC0
++
++#define AX88179A_BFM_DATA				0x0E
++	#define AX_TX_QUEUE_CFG				0x02
++	#define AX_TX_QUEUE_SET				0x08
++	#define AX_TX_Q1_AHB_FC_EN			0x10
++	#define AX_TX_Q2_AHB_FC_EN			0x20
++	#define AX_XGMII_EN					0x80
++#define AX88179A_ETH_TX_GAP				0x0D
++#define AX88179A_FLASH_READ				0x21
++#define AX88179A_FLASH_WEN				0x22
++#define AX88179A_FLASH_WDIS				0x23
++#define AX88179A_FLASH_WRITE			0x24
++#define AX88179A_FLASH_EARSE_ALL		0x25
++#define AX88179A_VLAN_ID_CONTROL		0x2B
++	#define AX_VLAN_CONTROL_WE			0x0001
++	#define AX_VLAN_CONTROL_RD			0x0002
++	#define AX_VLAN_CONTROL_VSO			0x0010
++	#define AX_VLAN_CONTROL_VFE			0x0020
++#define AX88179A_MAC_BM_INT_MASK		0x41
++#define AX88179A_MAC_BM_RX_DMA_CTL		0x43
++#define AX88179A_MAC_BM_TX_DMA_CTL		0x46
++#define AX88179A_CLK_EN_ARRAY_1			0x4B
++	#define AX_MAC_MII_TX_25M_EN		0x02
++	#define AX_MAC_RX_25M_EN			0x08
++#define AX88179A_MAC_CLK_SELECT_1		0x4D
++	#define AX_MAC_PCSCLK_MII_TX		0x01
++#define AX88179A_MAC_RX_STATUS_CDC		0x6D
++#define AX88179A_MAC_LSOFC_GMIIPF		0x6E
++	#define AX_GMII_CRC_APPEND			0x10
++	#define AX_LSOFC_WCNT_1_ACCESS		0x00
++	#define AX_LSOFC_WCNT_2_ACCESS		0x01
++	#define AX_LSOFC_WCNT_5_ACCESS		0x02
++	#define AX_LSOFC_WCNT_7_ACCESS		0x03
++#define AX88179A_MAC_RX_FILTER_CTRL		0x6F
++	#define AX_MAC_RX_FILTER_OFT_EN		0x80
++#define AX88179A_MAC_QUEUE_POINT		0x7F
++#define AX88179A_MAC_ARC_CTRL			0x9E
++#define AX88179A_CDC_ECM_CTRL			0xB0
++#define AX88179A_MAC_SWP_CTRL			0xB1
++#define AX88179A_MAC_TX_PAUSE_0			0xB2
++#define AX88179A_MAC_TX_PAUSE_1			0xB3
++#define AX88179A_MAC_TX_PAUSE_2			0xB4
++#define AX88179A_MAC_CDC_DELAY_TX		0xB5
++#define AX88179A_MAC_PATH				0xB7
++	#define AX_MAC_RX_PATH_READY		0x01
++	#define AX_MAC_TX_PATH_READY		0x02
++#define AX88179A_NEW_PAUSE_CTRL			0xB8
++	#define AX_NEW_PAUSE_EN				0x01
++#define AX88179A_MAC_BULK_OUT_CTRL		0xB9
++	#define AX_MAC_EFF_EN				0x02
++#define AX88179A_MAC_RX_DATA_CDC_CNT	0xC0
++#define AX88179A_MAC_BFM_CTRL			0xC1
++	#define AX_MAC_STOP_EP5_ACCESS		0x01
++	#define AX_MAC_STOP_EP3_ACCESS		0x02
++	#define AX_MAC_LSO_ERR_EN			0x04
++	#define AX_MAC_MIQFFCTRL_FORMAT		0x10
++	#define AX_MAC_MIQFFCTRL_DROP_CRC	0x20
++#define AX88179A_MAC_LSO_ENHANCE_CTRL	0xC3
++	#define AX_LSO_ENHANCE_EN			0x01
++#define AX88179A_MAC_TX_HDR_CKSUM		0xCC
++	#define AX_TXHDR_CKSUM_EN			0x01
++	#define AX_TXRX_INDV_RESET_EN		0x02
++#define AX88179A_MAC_CPU_CTRL_MAC_1		0xCE
++	#define AX_RX_INDV_RESET			0x01
++	#define AX_TX_INDV_RESET			0x02
++#define AX88179A_EP5_EHR				0xF9
++	#define AX_EP5_DAT_ERROR_HANDLE		0x80
++#define AX88179A_HW_EC_VERSION			0xFB
++#define AX88179A_SW_REVERSION			0xFC
++	#define AX88179A_FLASH_MODE			0x80
++
++#define PHY_1000M_STS					0x11
++	#define LINK_1000M_OK				0x1000
++#define PHY_100M_STS					0x10
++	#define LINK_100M_OK				0x1000
++#define PHY_10M_STS						0x16
++	#define LINK_10M_OK					0x40
++
++#ifdef ENABLE_AX88279
++#define AX_PBUS_A32						0x11
++
++#define AX_PBUS_REG_BASE_ADDR_HI		0x0013
++#define AX_TX_READY_CTRL				0x1008
++	#define AX_IPG_COUNTER_100M			0x28
++	#define AX_IPG_COUNTER_1G			0x22
++	#define AX_SOF_DELAY_COUNTER_100M	0x1C
++	#define AX_SOF_DELAY_COUNTER_1G		0x06
++	#define AX_VAILD_DELAY_COUNTER_100M	0x0F
++	#define AX_VAILD_DELAY_COUNTER_1G	0x07
++#define AX_MAC_CLK_CTRL					0x3004
++	#define AX_DIVIDE_PTP_CLK_SHIFT		0
++	#define AX_DIVIDE_AES_CLK_SHIFT		8
++	#define AX_PTP_CLK_EN				0x010000
++	#define AX_AES_CLK_EN				0x020000
++	#define AX_PTP_CLK_SELECT_DIVIDE	0x040000
++	#define AX_AES_CLK_SELECT_DIVIDE	0x080000
++	#define AX_XGMAC_TX_CLK_EN			0x100000
++	#define AX_XGMAC_RX_CLK_EN			0x200000
++#endif
++
++#define SWAP_32(val)	(((val >> 24) & 0x000000FF) | \
++						 ((val >>  8) & 0x0000FF00) | \
++						 ((val <<  8) & 0x00FF0000) | \
++						 ((val << 24) & 0xFF000000))
++#define SWAP_16(val)	((val >> 8) & 0x00FF) |  ((val <<  8) & 0xFF00)
++
++static uint8_t sample_type1[] = {
++	0x01, 0x0B, 0x95, 0x17,
++	0x90, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x01, 0x04,
++	0x00, 0x0A, 0x07, 0xFF,
++	0x39, 0xE1, 0x20, 0x00
++};
++
++static uint8_t sample_type2[] = {
++	0x02, 0x41, 0x53, 0x49,
++	0x58, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00
++};
++
++static uint8_t sample_type3[] = {
++	0x03, 0x41, 0x58, 0x38,
++	0x38, 0x32, 0x37, 0x39,
++	0x41, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00
++};
++
++static unsigned char sample_type4[] = {
++	0x04, 0x30, 0x30, 0x30,
++	0x30, 0x30, 0x30, 0x30,
++	0x31, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00
++};
++
++static unsigned char sample_type11[] = {
++	0x0B, 0x1F, 0x00, 0x00,
++	0x00, 0x00, 0x1F, 0x00,
++	0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x45, 0x0B
++};
++
++static unsigned char sample_type15[] = {
++	0x0F, 0x7D, 0x01, 0x63,
++	0x81, 0x7F, 0x7F, 0x5F,
++	0x5D, 0x2F, 0x07, 0xE8,
++	0x04, 0x7D, 0x00, 0xC8,
++	0x08, 0x01, 0x04, 0x00
++};
++
++#pragma pack(push)
++#pragma pack(1)
++enum Para_Type_Def {
++	TYPE_REV = 0x00,
++	TYPE_01 = 0x01,
++	TYPE_02 = 0x02,
++	TYPE_03 = 0x03,
++	TYPE_04 = 0x04,
++	TYPE_11 = 0x0B,
++	TYPE_15 = 0x0F,
++};
++struct _ef_type {
++#if __BYTE_ORDER == __BIG_ENDIAN
++	uint8_t	checksum: 4;
++	uint8_t	: 4;
++#else
++	uint8_t	type	: 4;
++	uint8_t	checksum: 4;
++#endif
++};
++
++struct _ef_type01 {
++	struct _ef_type	type;
++	uint16_t	vid;
++	uint16_t	pid;
++	uint8_t	mac[6];
++	uint16_t	bcdDevice;
++	uint8_t	bU1DevExitLat;
++	uint16_t	wU2DevExitLat;
++	uint8_t	SS_Max_Bus_Pw;
++	uint8_t	HS_Max_Bus_Pw;
++	uint8_t	IPSleep_Polling_Count;
++	uint8_t	reserve;
++};
++#define EF_TYPE_STRUCT_SIZE_01	sizeof(struct _ef_type01)
++
++struct _ef_type02 {
++	struct _ef_type	type;
++	uint8_t	m_string[18];
++	uint8_t	reserve;
++};
++#define EF_TYPE_STRUCT_SIZE_02	sizeof(struct _ef_type02)
++
++struct _ef_type03 {
++	struct _ef_type	type;
++	uint8_t	p_string[18];
++	uint8_t	reserve;
++};
++#define EF_TYPE_STRUCT_SIZE_03	sizeof(struct _ef_type03)
++
++struct _ef_type04 {
++	struct _ef_type	type;
++	uint8_t	serial[18];
++	uint8_t	reserve;
++};
++#define EF_TYPE_STRUCT_SIZE_04	sizeof(struct _ef_type04)
++
++struct _ef_type11 {
++	struct _ef_type	type;
++	uint8_t	dev_type0;
++	uint16_t	reg0;
++	uint16_t	value0;
++
++	uint8_t	dev_type1;
++	uint16_t	reg1;
++	uint16_t	value1;
++
++	uint8_t	dev_type2;
++	uint16_t	reg2;
++	uint16_t	value2;
++
++	uint8_t	reserved1[2];
++	uint8_t	subtype;
++	uint8_t	endofs;
++};
++#define EF_TYPE_STRUCT_SIZE_11	sizeof(struct _ef_type11)
++
++struct _ef_type15 {
++	struct _ef_type	type;
++	uint8_t	flag1;
++	uint8_t	flag2;
++	uint8_t	flag3;
++	uint8_t	flag4;
++	uint8_t	U1_inact_timer;
++	uint8_t	U2_inact_timer;
++	uint8_t	Lpm_besl_u3;
++	uint8_t	Lpm_besl;
++	uint8_t	Lpm_besld;
++	uint16_t	Ltm_belt_down;
++	uint16_t	Ltm_belt_up;
++	uint16_t	Ephy_poll_timer;
++
++	uint8_t	Pme_gpio_sel;
++	uint8_t	Pme_pulse_width;
++	uint8_t	Wol_mask_timer;
++
++	uint8_t	reserve;
++};
++#define EF_TYPE_STRUCT_SIZE_15	sizeof(struct _ef_type15)
++
++struct _ef_data_struct {
++	union {
++		struct _ef_type01 type01;
++		struct _ef_type02 type02;
++		struct _ef_type03 type03;
++		struct _ef_type04 type04;
++		struct _ef_type11 type11;
++		struct _ef_type15 type15;
++	} ef_data;
++};
++#define EF_DATA_STRUCT_SIZE	sizeof(struct _ef_data_struct)
++#pragma pack(pop)
++
++struct ax_device {
++	struct usb_device *udev;
++	uint8_t fw_version[4];
++	uint8_t mac_addr[MAC_ADDR_LEN];
++	uint8_t eeprom_data[EEPROM_SIZE];
++	uint8_t *rpara_buf;
++};
++
++#if defined(CONFIG_CMD_AX_PROGRAMMER)
++
++static int ax_write_cmd(struct usb_device *udev, uint8_t cmd, uint16_t value,
++				uint16_t index, uint16_t size, void *data)
++{
++	ALLOC_CACHE_ALIGN_BUFFER(uint8_t, buf, size);
++	int len;
++
++	memcpy(buf, data, size);
++	len = usb_control_msg(
++				udev,
++				usb_sndctrlpipe(udev, 0),
++				cmd,
++				USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
++				value,
++				index,
++				buf,
++				size,
++				USB_CTRL_SET_TIMEOUT_MS);
++
++	return len == size ? 0 : -1;
++}
++
++static int ax_read_cmd(struct usb_device *udev, uint8_t cmd, uint16_t value,
++				uint16_t index, uint16_t size, void *data)
++{
++	ALLOC_CACHE_ALIGN_BUFFER(uint8_t, buf, size);
++	int len;
++
++	len = usb_control_msg(
++				udev,
++				usb_rcvctrlpipe(udev, 0),
++				cmd,
++				USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
++				value,
++				index,
++				buf,
++				size,
++				USB_CTRL_GET_TIMEOUT_MS);
++	memcpy(data, buf, size);
++	return len == size ? 0 : -1;
++}
++
++static int ax_read_flash(struct usb_device *udev, void *data,
++				int offset, int length)
++{
++	int i, ret = 0;
++	uint8_t *dst = NULL;
++	uint8_t *block;
++
++	block = malloc(256);
++	if (!block) {
++		return -1;
++	}
++	memset(block, 0, 256);
++
++	dst = (uint8_t *) data;
++	for (i = offset; i < (offset + length); i += 256) {
++		ret = ax_read_cmd(udev, AX88179A_FLASH_READ,
++					(uint16_t)((i >> 16) & 0xFFFF),
++					(uint16_t)(i & 0xFFFF), 256, block);
++		if (ret < 0) {
++			free(block);
++			return ret;
++		}
++		memcpy(dst, block, 256);
++		dst += 256;
++	}
++	free(block);
++	return 0;
++}
++
++static int ax_write_flash(struct usb_device *udev, uint8_t *data,
++				int offset, int length)
++{
++	int i, ret = 0;
++	uint8_t *src = NULL;
++	uint8_t *block;
++
++	if (!data) {
++		return -1;
++	}
++
++	block = malloc(256);
++	if (!block) {
++		return -1;
++	}
++
++	ret = ax_write_cmd(udev, AX88179A_FLASH_WEN, 0, 0, 0, NULL);
++	if (ret < 0) {
++		goto w_fail;
++	}
++
++	src = (uint8_t *) data;
++	for (i = offset; i < (offset + length); i += 256) {
++		memcpy(block, src, 256);
++		ret = ax_write_cmd(udev, AX88179A_FLASH_WRITE,
++					(uint16_t)((i >> 16) & 0xFFFF),
++					(uint16_t)(i & 0xFFFF), 256, block);
++		if (ret < 0) {
++			goto w_fail;
++		}
++		src += 256;
++	}
++
++	ret = ax_write_cmd(udev, AX88179A_FLASH_WDIS, 0, 0, 0, NULL);
++	if (ret < 0) {
++		goto w_fail;
++	}
++
++w_fail:
++	if (block) {
++		free(block);
++	}
++	return ret;
++}
++
++static int ax_erase_sector(struct usb_device *udev, int offset)
++{
++	int ret = 0;
++
++	ret = ax_write_cmd(udev, AX88179A_FLASH_WEN, 0, 0, 0, NULL);
++	if (ret < 0) {
++		return ret;
++	}
++
++	ret = usb_control_msg(
++				udev,
++				usb_sndctrlpipe(udev, 0),
++				0x28,
++				USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
++				(offset >> 16) & 0xFFFF,
++				(offset & 0xFFFF),
++				NULL,
++				0,
++				300000);
++	if (ret < 0) {
++		return ret;
++	}
++
++	ret = ax_write_cmd(udev, AX88179A_FLASH_WDIS, 0, 0, 0, NULL);
++	if (ret < 0) {
++		return ret;
++	}
++
++	return 0;
++}
++
++static int ax_erase_flash(struct usb_device *udev)
++{
++	int ret = 0;
++
++	ret = ax_write_cmd(udev, AX88179A_FLASH_WEN, 0, 0, 0, NULL);
++	if (ret < 0) {
++		return ret;
++	}
++
++	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
++				  AX88179A_FLASH_EARSE_ALL,
++				  USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
++				  0, 0, NULL, 0, 360000);
++	if (ret < 0) {
++		return ret;
++	}
++
++	ret = ax_write_cmd(udev, AX88179A_FLASH_WDIS, 0, 0, 0, NULL);
++	if (ret < 0) {
++		return ret;
++	}
++
++	return 0;
++}
++
++struct usb_device * find_usb_device(struct usb_device *udev,
++				uint16_t vendor, uint16_t product)
++{
++	struct udevice *child;
++
++	if (udev->descriptor.bDescriptorType == USB_DT_DEVICE) {
++		if (udev->descriptor.idVendor == vendor &&
++			udev->descriptor.idProduct == product) {
++			return udev;
++		}
++	}
++	for (device_find_first_child(udev->dev, &child);
++		 child;
++		 device_find_next_child(&child)) {
++		if (device_active(child) &&
++			(device_get_uclass_id(child) != UCLASS_USB_EMUL) &&
++			(device_get_uclass_id(child) != UCLASS_BLK)) {
++			struct usb_device *usbdev;
++			udev = dev_get_parent_priv(child);
++			usbdev = find_usb_device(udev, vendor, product);
++			if (usbdev) {
++				return usbdev;
++			}
++		}
++	}
++	return NULL;
++}
++
++static int ax_sw_reset(struct usb_device *udev)
++{
++	uint32_t buf = 0;
++
++	*((uint32_t *)&buf) = 1;
++	*((uint8_t *)&buf) = 0x41;
++	ax_write_cmd(udev, 0x2A, 0xAA00, 0, 1, &buf);
++
++	mdelay(RELOAD_DELAY_TIME * 100);
++	return 0;
++}
++
++struct usb_device *find_ax_device(uint16_t vendor, uint16_t product)
++{
++	struct udevice *bus;
++
++	// stop usb first
++	usb_stop();
++
++	printf("### Initializing USB devices...\n");
++
++	if (usb_init() < 0) {
++		printf("[Error] USB initialization failed!\n");
++		return NULL;
++	}
++
++	printf("### Scan ASIX USB-to-Ethernet devices...\n");
++	for (uclass_find_first_device(UCLASS_USB, &bus);
++		bus;
++		uclass_find_next_device(&bus)) {
++		struct usb_device *udev;
++		struct udevice *dev;
++
++		if (!device_active(bus))
++			continue;
++
++		device_find_first_child(bus, &dev);
++		if (dev && device_active(dev)) {
++			struct udevice *child;
++			udev = dev_get_parent_priv(dev);
++			for (device_find_first_child(udev->dev, &child);
++				 child;
++				 device_find_next_child(&child)) {
++				if (device_active(child) &&
++					(device_get_uclass_id(child) != UCLASS_USB_EMUL) &&
++					(device_get_uclass_id(child) != UCLASS_BLK)) {
++					struct usb_device *usbdev;
++					udev = dev_get_parent_priv(child);
++					usbdev = find_usb_device(udev, vendor, product);
++					if (usbdev) {
++						printf("### Found %04x:%04x bcdDevice %4.4x\n",
++							usbdev->descriptor.idVendor,
++							usbdev->descriptor.idProduct,
++							usbdev->descriptor.bcdDevice);
++						return usbdev;
++					}
++				}
++			}
++		}
++	}
++	return NULL;
++}
++
++static void ax_get_fw_version(struct usb_device *udev, uint8_t *revsion)
++{
++	int i;
++	uint8_t fw[4];
++
++	for (i = 0; i < 3; i++) {
++		if (ax_read_cmd(udev, AX88179A_ACCESS_BL,(0xFD + i), 1, 1,
++					&fw[i]) < 0) {
++			fw[i] = ~0;
++		}
++	}
++
++	if (ax_read_cmd(udev, AX88179A_ACCESS_BL, AX88179A_SW_REVERSION,
++					1, 1, &fw[3]) < 0)
++		fw[3] = ~0;
++	else
++		fw[3] &= 0xF;
++
++	memcpy(revsion, fw, 4);
++}
++
++static int ax_get_mac_address(struct usb_device *udev, uint8_t *macaddr)
++{
++	int ret;
++	uint8_t mac[MAC_ADDR_LEN];
++
++	ret = ax_read_cmd(udev, AX_ACCESS_MAC, AX_NODE_ID, MAC_ADDR_LEN,
++			MAC_ADDR_LEN, mac);
++	if (ret < 0) {
++		return ret;
++	}
++	memcpy(macaddr, mac, 6);
++	return 0;
++}
++
++int eth_parse_enetaddr(const char *addr, u8 *enetaddr)
++{
++	int i;
++	char *end, *p;
++
++	if (strlen(addr) != 17) {
++		return -1;
++	}
++
++	for (i = 0; i < 6; i++) {
++		enetaddr[i] = simple_strtoul(addr, &end, 16);
++		if ((i < 5 && *end != ':') || (i == 5 && *end != '\0')) {
++			return -1; // Invalid format
++		}
++		for (p = addr; p < end; p++) {
++			if (!isxdigit(*p)) {
++				// Char should be '0'-'9' & 'A(a)'-'F(f)'
++				return -1;
++			}
++		}
++		addr = end + 1;
++	}
++	return 0;
++}
++
++static int find_block_index(uint8_t *rpara_databuf, int para_size
++							, enum Para_Type_Def type)
++{
++	int i = 0;
++
++	for (i = 0; i < para_size; i += 20) {
++		if ((rpara_databuf[i] & 0x0F) == type)
++			return i / 20;
++	}
++
++	return -1;
++}
++
++static int change_para_macaddr(uint8_t *rpara_databuf, int block_index, uint8_t *mac)
++{
++	int i;
++
++	for (i = 0; i < 6; i++) {
++		rpara_databuf[block_index * FLASH_BLOCK_SIZE + 5 + i] = (uint8_t)mac[i];
++	}
++
++	return 0;
++}
++
++static int change_para_serialnum(uint8_t *rpara_databuf, int block_index, char *serial)
++{
++	int i;
++
++	for (i = 0; i < 18; i++) {
++		if (serial[i] == '-') {
++			break;
++		}
++		rpara_databuf[block_index * FLASH_BLOCK_SIZE + 1 + i] = serial[i];
++	}
++
++	return 0;
++}
++
++static int change_para_productstr(uint8_t *rpara_databuf, int block_index, char *productstr)
++{
++	int i;
++
++	for (i = 0; i < 18; i++) {
++		if (productstr[i] == '-') {
++			break;
++		}
++		rpara_databuf[block_index * FLASH_BLOCK_SIZE + 1 + i] = productstr[i];
++	}
++
++	return 0;
++}
++
++static int change_para_manufacture(uint8_t *rpara_databuf, int block_index, char *manufac)
++{
++	int i;
++
++	for (i = 0; i < 18; i++) {
++		if (manufac[i] == '-')
++			break;
++		rpara_databuf[block_index * FLASH_BLOCK_SIZE + 1 + i] = manufac[i];
++	}
++
++	return 0;
++}
++
++static void checksum_efuse_block(uint8_t *block)
++{
++	uint32_t sum = 0;
++	int j;
++
++	for (j = 0; j < 4; j++) {
++		if (j == 0) {
++			sum += block[j] & 0xF;
++		} else {
++			sum += block[j];
++		}
++	}
++
++	while (sum > 0xF) {
++		sum = (sum & 0xF) + (sum >> 4);
++	}
++	sum = 0xF - sum;
++	block[0] = (block[0] & 0xF) | ((sum << 4) & 0xF0);
++}
++
++static void checksum_para_header(uint16_t *header)
++{
++	uint32_t sum = 0;
++	uint16_t j;
++
++	for (j = 0; j < 5; j++) {
++		sum += header[j];
++	}
++
++	while (sum > 0xFFFF) {
++		sum = (sum & 0xFFFF) + (sum >> 16);
++	}
++
++	sum = 0xFFFF - sum;
++
++	header[5] = sum;
++}
++
++static int check_hex(char *temp, int size)
++{
++	int i = 0;
++	uint8_t *ptemp = temp;
++
++	for (i = 0; i < size; i++) {
++		if(!isxdigit(ptemp[i])) {
++			return -1;
++		}
++	}
++
++	return 0;
++}
++
++static void print_help(int argc, char *const argv[])
++{
++	printf("\n");
++	printf("Asix USB-to-Ethernet EEPROM programming utility\n");
++	printf("\n");
++	printf("Usage:\n");
++	printf("%s rversion\n    -- Read firmware version.\n", argv[0]);
++	printf("%s rmacaddr\n    -- Read mac address.\n", argv[0]);
++	printf("%s rflash [offset] [length]\n    -- Dump flash content.\n", argv[0]);
++	printf("%s wflash usb [filename]\n    -- Burn firmware from usb storage to flash.\n", argv[0]);
++	printf("%s wpara -a [mac] -s [sn] -p [product] -m [manufacture]\n    -- Write parameters.\n", argv[0]);
++	printf("    -a [mac]          - MAC address (xx:xx:xx:xx:xx:xx) x:0-F\n");
++	printf("    -s [sn]           - Serial number (Characters must be less than 19 bytes) x:0-F\n");
++	printf("    -p [product]      - Product string (Characters must be less than 19 bytes)\n");
++	printf("    -p [manufacture]  - Manufacture name (Characters must be less than 19 bytes)\n");
++}
++
++static int do_ax_read_flash(struct ax_device *axdev, int argc,
++	char *const argv[])
++{
++	int i, j, ret;
++	int offset;
++	int length;
++	ulong dest = NULL;
++	void *dst;
++
++	// ax_prog rflash [offset] [length] [$addr]
++	if (!axdev || argc < 4) {
++		printf("[Error]Invalid parameter!\n");
++		return -1;
++	}
++
++	offset = simple_strtoul(argv[2], NULL, 16);
++	length = simple_strtoul(argv[3], NULL, 16);
++
++	if (argc == 5){
++		dest = simple_strtoul(argv[4], NULL, 16);
++	}
++
++	if (dest) {
++		dst = map_sysmem(dest, length);
++		ret = ax_read_flash(axdev->udev, dst, offset, length);
++		unmap_sysmem(dst);
++		return 0;
++	} else {
++		uint8_t buf[256];
++		int size = length, addr = offset, len;
++
++		printf("Flash Contents:\n");
++		while (size > 0) {
++			len = (size < 256)? size : 256;
++			memset(buf, 0, sizeof(buf));
++			ret = ax_read_flash(axdev->udev, buf, addr, len);
++			if (ret < 0) {
++				break;
++			}
++			for (i = addr; i < (addr + len); i += 16) {
++				printf("%05x: ", i);
++				for (int j = 0; j < 16 && (i + j) < (addr + len); j++) {
++					printf("%02x ", buf[(i + j) % 256]);
++				}
++				printf("\n");
++			}
++			size -= len;
++			addr += len;
++		}
++	}
++	return 0;
++}
++
++#if defined(CONFIG_USB_STORAGE) && defined(CONFIG_BLK)
++static ulong get_load_addr(void)
++{
++	const char *addr_str;
++	unsigned long addr;
++
++	addr_str = env_get("loadaddr");
++	if (addr_str)
++		addr = hextoul(addr_str, NULL);
++	else
++		addr = CONFIG_SYS_LOAD_ADDR;
++
++	return addr;
++}
++
++static size_t usb_read_file(const char *file_name)
++{
++	loff_t act_read = 0;
++	struct udevice *dev;
++	int rc;
++
++	printf("### Loading firmware from USB storage...\n");
++	/* Try to recognize storage devices immediately */
++	blk_first_device(IF_TYPE_USB, &dev);
++	if (!dev) {
++		printf("[Error] USB storage device not found\n");
++		return 0;
++	}
++
++	/* Always load from usb 0 */
++	if (fs_set_blk_dev("usb", "0", FS_TYPE_ANY)) {
++		printf("[Error] USB 0 not found\n");
++		return 0;
++	}
++
++	/* Perfrom file read */
++	rc = fs_read(file_name, get_load_addr(), 0, 0, &act_read);
++	if (rc)
++		return 0;
++
++	return act_read;
++}
++
++static int do_ax_write_flash(struct ax_device *axdev, int argc,
++	char *const argv[])
++{
++	// ax_prog wflash [usb] [filename]
++
++	int i, ret = 0, offset;
++	ulong addr, size;
++	uint8_t *src = NULL;
++	char *firmware = NULL;
++	char fw_version[16] = {0};
++
++	if (!axdev || argc < 4) {
++		printf("[Error]Invalid parameter!\n");
++		return -1;
++	}
++
++	if (strcmp(argv[2], "usb")) {
++		return -1;
++	}
++	firmware = argv[3];
++
++	size = usb_read_file(firmware);
++	addr = get_load_addr();
++
++	if (!addr || size == 0) {
++		return -1;
++	}
++	size = (size + 256) & ~(0xFF); // align block size
++
++	src = map_sysmem(addr, size);
++
++	offset = SWAP_32(*(uint32_t *)&src[0]);
++	sprintf(fw_version, "v%d.%d.%d",
++		src[offset + 0x1000],
++		src[offset + 0x1001],
++		src[offset + 0x1002]);
++	printf("### File FW Version: %s\n", fw_version);
++
++	printf("### Erasing flash...\n");
++	if (ax_erase_flash(axdev->udev) == -110) {
++		mdelay(1000);
++	}
++
++	printf("### Writing firmware to flash...\n");
++	ret = ax_write_flash(axdev->udev, &src[FLASH_PARA_OFFSET],
++				FLASH_PARA_OFFSET, size);
++	if (ret < 0) {
++		goto f_flash;
++	}
++	ret = ax_write_flash(axdev->udev, &src[0], 0, FLASH_PARA_OFFSET);
++	if (ret < 0) {
++		goto f_flash;
++	}
++
++f_flash:
++	unmap_sysmem(src);
++	if (ret < 0) {
++		printf("### [Error] Write image fail!\n");
++	} else {
++		printf("### Write image completed!\n");
++	}
++	return ret;
++}
++#endif
++
++static int do_ax_programmer(struct cmd_tbl *cmdtp, int flag, int argc,
++							char *const argv[])
++{
++	int ret = 0, i;
++	struct ax_device *priv;
++	struct usb_device *udev;
++
++	priv = malloc(sizeof(struct ax_device));
++
++	if (!priv) {
++		return CMD_RET_FAILURE;
++	}
++	memset(priv, 0, sizeof(struct ax_device));
++
++	if (argc < 2 || strcmp(argv[1], "help") == 0) {
++		print_help(argc, argv);
++		return CMD_RET_SUCCESS;
++	}
++
++	udev = find_ax_device(AX88279_USB_VID, AX88279_USB_PID);
++
++	if (!udev) {
++		printf("[Error]Unable found ASIX usb ethernet device!\n");
++		return CMD_RET_FAILURE;
++	}
++	printf("\n");
++	priv->udev = udev;
++
++	if (strcmp(argv[1], "rversion") == 0) {
++		ax_get_fw_version(udev, priv->fw_version);
++		printf("Firmware Version: %d.%d.%d.%d\n",
++				priv->fw_version[0],
++				priv->fw_version[1],
++				priv->fw_version[2],
++				priv->fw_version[3]);
++	} else if (strcmp(argv[1], "rmacaddr") == 0) {
++		ret = ax_get_mac_address(udev, priv->mac_addr);
++		if (ret == 0) {
++			printf("MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
++				priv->mac_addr[0], priv->mac_addr[1], priv->mac_addr[2],
++				priv->mac_addr[3], priv->mac_addr[4], priv->mac_addr[5]);
++		} else {
++			printf("[Error]Unable to get MAC address!\n");
++		}
++#if defined(CONFIG_USB_STORAGE) && defined(CONFIG_BLK)
++	} else if (strcmp(argv[1], "wflash") == 0) {
++		ret = do_ax_write_flash(priv, argc, argv);
++#endif /* CONFIG_USB_STORAGE && CONFIG_BLK */
++	} else if (strcmp(argv[1], "rflash") == 0) {
++		ret = do_ax_read_flash(priv, argc, argv);
++	} else if (strcmp(argv[1], "wpara") == 0) {
++		uint8_t mac[6] = {0};
++		uint8_t serial[19] = {0};
++		uint8_t product[19] = {0};
++		uint8_t manufacture[19] = {0};
++		uint8_t *rpara_buf = NULL;
++		int para_offset, block_count, para_size, block_index;
++
++		if (((argc - 2) % 2) > 0) {
++			ret = -1;
++			printf("[Error]Invalid arguments\n");
++			print_help(argc, argv);
++			goto quit_wpara;
++		}
++		for (i = 2; i < argc; i++) {
++			if (strcmp(argv[i], "-a") == 0) { // mac address
++				if (eth_parse_enetaddr(argv[i + 1], mac) < 0) {
++					// parse mac address fail
++					ret = -1;
++					print_help(argc, argv);
++					goto quit_wpara;
++				}
++				i++;
++			} else if (strcmp(argv[i], "-s") == 0) { // serial number
++				if (strlen(argv[i + 1]) > 18 ||
++					check_hex(argv[i + 1], strlen(argv[i + 1])) < 0) {
++					// parse serial number fail
++					ret = -1;
++					print_help(argc, argv);
++					goto quit_wpara;
++				}
++				strcpy(serial, argv[i + 1]);
++				i++;
++			} else if (strcmp(argv[i], "-p") == 0) { // product string
++				if (strlen(argv[i + 1]) > 18) {
++					// parse product string fail
++					ret = -1;
++					print_help(argc, argv);
++					goto quit_wpara;
++				}
++				strcpy(product, argv[i + 1]);
++				i++;
++			} else if (strcmp(argv[i], "-m") == 0) { // manufacture name
++				if (strlen(argv[i + 1]) > 18) {
++					// parse manufacture string fail
++					ret = -1;
++					print_help(argc, argv);
++					goto quit_wpara;
++				}
++				strcpy(manufacture, argv[i + 1]);
++				i++;
++			}
++		}
++
++		rpara_buf = (uint8_t *)malloc((FLASH_SIZE + 256) & ~(0xFF));
++		if (!rpara_buf) {
++			ret = -2;
++			printf("[Error]No enough memory to allocate buffer!\n");
++			goto quit_wpara;
++		}
++		memset(rpara_buf, 0xFF, (FLASH_SIZE + 256) & ~(0xFF));
++		ret = ax_read_flash(udev, rpara_buf, 0, 0x3000);
++		if (ret < 0) {
++			ret = -3;
++			printf("[Error]Unable read flash data!\n");
++			goto quit_wpara;
++		}
++
++		if (*(uint16_t *)&rpara_buf[PARAMETER_PRI_HEADER_OFFSET] != 0xA55A) {
++			para_offset = 0x3000;
++			block_count = 0;
++		} else {
++			para_offset = SWAP_32(*(uint32_t *)&rpara_buf[PARAMETER_PRI_OFFSET]);
++			block_count = SWAP_16(*(uint16_t *)&rpara_buf[PARAMETER_PRI_BLOCK_COUNT]);
++		}
++
++		para_size = 0;
++		if (block_count) {
++			para_size = block_count * FLASH_BLOCK_SIZE;
++			ret = ax_read_flash(udev, &rpara_buf[para_offset], para_offset, para_size);
++			if (ret < 0) {
++				ret = -3;
++				printf("[Error]Unable read flash data!\n");
++				goto quit_wpara;
++			}
++		}
++
++		block_index = -1;
++		if (mac[0]) {
++			if (para_size) {
++				block_index = find_block_index(&rpara_buf[para_offset], para_size, TYPE_01);
++			}
++			if (block_index == -1) {
++				block_index = para_size / 20;
++				memcpy(&rpara_buf[para_offset + block_index * 20], sample_type1, 20);
++				para_size += 20;
++			}
++
++			ret = change_para_macaddr(&rpara_buf[para_offset], block_index, mac);
++			if (ret < 0) {
++				ret = -4;
++				printf("[Error]Unable set mac address!\n");
++				goto quit_wpara;
++			}
++			checksum_efuse_block(&rpara_buf[para_offset + block_index * 20]);
++		}
++
++		if (serial[0]) {
++			if (para_size) {
++				block_index = find_block_index(&rpara_buf[para_offset], para_size, TYPE_04);
++			}
++			if (block_index == -1) {
++				block_index = para_size / 20;
++				memcpy(&rpara_buf[para_offset + block_index * 20], sample_type4, 20);
++				para_size += 20;
++			}
++
++			ret = change_para_serialnum(&rpara_buf[para_offset], block_index, serial);
++			if (ret < 0) {
++				ret = -5;
++				printf("[Error]Unable set serial number!\n");
++				goto quit_wpara;
++			}
++			checksum_efuse_block(&rpara_buf[para_offset + block_index * 20]);
++		}
++
++		if (product[0]) {
++			if (para_size)
++				block_index = find_block_index(&rpara_buf[para_offset], para_size, TYPE_03);
++			if (block_index == -1) {
++				block_index = para_size / 20;
++				memcpy(&rpara_buf[para_offset + block_index * 20], sample_type3, 20);
++				para_size += 20;
++			}
++
++			ret = change_para_productstr(&rpara_buf[para_offset], block_index, product);
++			if (ret < 0) {
++				ret = -6;
++				printf("[Error]Unable set product string!\n");
++				goto quit_wpara;
++			}
++			checksum_efuse_block(&rpara_buf[para_offset + block_index * 20]);
++		}
++
++		if (manufacture[0]) {
++			if (para_size)
++				block_index = find_block_index(&rpara_buf[para_offset], para_size, TYPE_02);
++			if (block_index == -1) {
++				block_index = para_size / 20;
++				memcpy(&rpara_buf[para_offset + block_index * 20], sample_type2, 20);
++				para_size += 20;
++			}
++
++			ret = change_para_manufacture(&rpara_buf[para_offset], block_index, manufacture);
++			if (ret < 0) {
++				ret = -7;
++				printf("[Error]Unable set manufacture string!\n");
++				goto quit_wpara;
++			}
++			checksum_efuse_block(&rpara_buf[para_offset + block_index * 20]);
++		}
++		printf("### Erase parameter block...\n");
++		ax_erase_sector(udev, PARAMETER_PRI_HEADER_OFFSET);
++		ax_erase_sector(udev, para_offset);
++
++		if (*(uint16_t *)&rpara_buf[PARAMETER_PRI_HEADER_OFFSET] != 0xA55A) {
++			//printf("Not 0xA55A, create header\n");
++			rpara_buf[PARAMETER_PRI_HEADER_OFFSET] = 0x5A;
++			rpara_buf[PARAMETER_PRI_HEADER_OFFSET + 1] = 0xA5;
++			rpara_buf[PARAMETER_PRI_HEADER_OFFSET + 2] = 0x04;
++			rpara_buf[PARAMETER_PRI_HEADER_OFFSET + 3] = 0;
++		}
++
++		*(uint32_t *)&rpara_buf[PARAMETER_PRI_OFFSET] = SWAP_32(para_offset);
++		*(uint16_t *)&rpara_buf[PARAMETER_PRI_BLOCK_COUNT] = SWAP_16(para_size / 20);
++		checksum_para_header((uint16_t *)&rpara_buf[PARAMETER_PRI_HEADER_OFFSET]);
++
++		printf("### Write parameters to flash...\n");
++		ax_write_flash(udev, &rpara_buf[PARAMETER_PRI_HEADER_OFFSET], PARAMETER_PRI_HEADER_OFFSET, 256);
++		ax_write_flash(udev, &rpara_buf[para_offset], para_offset, para_size);
++
++		printf("### Write parameters completed!\n");
++		printf("### Reset device...\n");
++		ax_sw_reset(udev);
++quit_wpara:
++		if (rpara_buf) {
++			free(rpara_buf);
++		}
++	}
++	if (priv) {
++		free(priv);
++	}
++	return ret == 0 ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
++}
++
++U_BOOT_CMD(
++	axprog, 10, 0, do_ax_programmer,
++	"Asix USB-to-Ethernet EEPROM programming utility",
++	"\n  rversion - Read firmware version\n"
++	"  rmacaddr - Read mac address\n"
++	"  rflash [offset] [length] - Dump flash content\n"
++	"  wflash usb [filename] - Burn firmware to flash\n"
++	"  wpara -a [mac] -s [sn] -p [prod] -m [manuf] - Write parameters to flash\n"
++);
++
++#endif /* CONFIG_CMD_AX_PROGRAMMER */
+-- 
+2.47.1
+
