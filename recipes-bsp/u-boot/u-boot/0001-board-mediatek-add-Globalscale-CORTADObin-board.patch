@@ -1,40 +1,40 @@
-From 7a56b9de3a8ca4ed4cf106ece082818ff11afe17 Mon Sep 17 00:00:00 2001
+From 00ad995b5c84122bbf3c77e0e1b7873744f56a63 Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
-Date: Wed, 17 Jul 2024 17:13:12 +0800
-Subject: [PATCH] board: mediatek: add Globalscale MT510SS evk board
+Date: Thu, 23 Jan 2025 08:35:45 +0800
+Subject: [PATCH 1/9] board: mediatek: add Globalscale CORTADObin board
 
-Add Globalscale MT510SS EVK board support.
-This EVK evaluation board uses MediaTek's MT8370 SoC (Genio-510).
+Add Globalscale CORTADObin board support.
+The board uses MediaTek's MT8370 SoC (Genio-510) solution.
 ---
- arch/arm/dts/Makefile            |   3 +-
- arch/arm/dts/gti-mt510ss-evk.dts | 365 +++++++++++++++++++++++++++++++
- 2 files changed, 367 insertions(+), 1 deletion(-)
+ arch/arm/dts/Makefile            |   3 +
+ arch/arm/dts/gti-mt510ss-evk.dts | 535 +++++++++++++++++++++++++++++++
+ 2 files changed, 538 insertions(+)
  create mode 100644 arch/arm/dts/gti-mt510ss-evk.dts
 
 diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
-index e10c5ace83..8f68af6765 100644
+index d7fc348220..5899fc7c8b 100644
 --- a/arch/arm/dts/Makefile
 +++ b/arch/arm/dts/Makefile
-@@ -1244,7 +1244,8 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
- 	genio-510-evk.dtb \
- 	genio-700-evk.dtb \
- 	genio-1200-evk.dtb \
--	genio-1200-evk-ufs.dtb
-+	genio-1200-evk-ufs.dtb \
-+	gti-mt510ss-evk.dtb
+@@ -1247,6 +1247,9 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+ 	genio-1200-evk-ufs.dtb \
+ 	genio-1200-evk-ufs-qspi.dtb
  
++dtb-$(CONFIG_ARCH_MEDIATEK) += \
++	gti-mt510ss-evk.dtb
++
  dtb-$(CONFIG_ARCH_NPCM7xx) += nuvoton-npcm750-evb.dtb
  dtb-$(CONFIG_XEN) += xenguest-arm64.dtb
+ 
 diff --git a/arch/arm/dts/gti-mt510ss-evk.dts b/arch/arm/dts/gti-mt510ss-evk.dts
 new file mode 100644
-index 0000000000..1ed76ca57f
+index 0000000000..06f1ac3cca
 --- /dev/null
 +++ b/arch/arm/dts/gti-mt510ss-evk.dts
-@@ -0,0 +1,365 @@
+@@ -0,0 +1,535 @@
 +// SPDX-License-Identifier: GPL-2.0 OR MIT
 +/*
-+ * Copyright (C) 2023 MediaTek Inc.
-+ * Author: Macpaul Lin <macpaul.lin@mediatek.com>
++ * Copyright (C) 2025 Globalscale Technologies Inc.
++ * Author: Jason Hung <jhung@globalscaletechnologies.com>
 + */
 +
 +/dts-v1/;
@@ -43,13 +43,32 @@ index 0000000000..1ed76ca57f
 +#include "mt8370.dtsi"
 +
 +/ {
-+	model = "Globalscale MT510-SS EVK";
++	model = "Globalscale CORTADObin board";
 +	compatible = "globalscale,mt510ss-evk",
 +				 "mediatek,genio-510-evk",
 +				 "mediatek,mt8370";
 +
++	sysinfo {
++		compatible = "u-boot,sysinfo-smbios";
++		smbios {
++			system {
++				manufacturer = "Globalscale Technologies Inc.";
++				product = "CORTADOBIN";
++				version = "v1.2.0";
++				sku = "MT510SS";
++				family = "MT510SS";
++			};
++			baseboard {
++				manufacturer = "Globalscale Technologies Inc.";
++				product = "CORTADOBIN";
++			};
++			chassis {
++				manufacturer = "Globalscale Technologies Inc.";
++			};
++		};
++	};
++
 +	memory@40000000 {
-+		/* 4GB */
 +		device_type = "memory";
 +		reg = <0 0x40000000 1 0x00000000>;
 +	};
@@ -121,7 +140,19 @@ index 0000000000..1ed76ca57f
 +		regulator-always-on;
 +	};
 +
-+    /* 3.3v power for wifi module */
++    /* 1.8v / 5v power for system */
++	vdd_1v8_5v: vdd-1v8-5v {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd-1v8-5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio 10 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	/* 3.3v power for wifi module */
 +	wcn_3v3_en: wcn-3v3-en {
 +		compatible = "regulator-fixed";
 +		regulator-name = "wcn-3v3-en";
@@ -169,7 +200,19 @@ index 0000000000..1ed76ca57f
 +		reset-gpios = <&gpio 25 GPIO_ACTIVE_HIGH>;
 +		dcdc-gpios = <&gpio 45 GPIO_ACTIVE_HIGH>;
 +		enable-gpios = <&pca9554 7 GPIO_ACTIVE_HIGH>;
++		clocks = <&topckgen CLK_TOP_DISP_PWM1>,
++				 <&infracfg_ao CLK_INFRA_AO_DISP_PWM1>;
++		clock-names = "main", "mm";
 +		status = "okay";
++	};
++
++	vmch_ext: vmch-ext {
++		compatible = "regulator-fixed";
++		regulator-name = "vmch_ext";
++		regulator-min-microvolt = <3100000>;
++		regulator-max-microvolt = <3100000>;
++		enable-active-high;
++		gpio = <&pio 4 GPIO_ACTIVE_HIGH>;
 +	};
 +};
 +
@@ -192,6 +235,18 @@ index 0000000000..1ed76ca57f
 +	vmmc-supply = <&reg_3p3v>;
 +	vqmmc-supply = <&reg_1p8v>;
 +	non-removable;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_default>;
++	bus-width = <4>;
++	max-frequency = <52000000>;
++	cap-sd-highspeed;
++	cd-gpios = <&pio 2 GPIO_ACTIVE_LOW>;
++	vmmc-supply = <&vmch_ext>;
++	vqmmc-supply = <&reg_3p3v>;
 +	status = "okay";
 +};
 +
@@ -286,6 +341,99 @@ index 0000000000..1ed76ca57f
 +			bias-pull-up;
 +		};
 +	};
++
++	mmc1_pins_default: mmc1default {
++		pins-cmd-dat {
++			pinmux = <PINMUX_GPIO163__FUNC_B1_MSDC1_CMD>,
++				 <PINMUX_GPIO165__FUNC_B1_MSDC1_DAT0>,
++				 <PINMUX_GPIO166__FUNC_B1_MSDC1_DAT1>,
++				 <PINMUX_GPIO167__FUNC_B1_MSDC1_DAT2>,
++				 <PINMUX_GPIO168__FUNC_B1_MSDC1_DAT3>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_6mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
++		};
++
++		pins-clk {
++			pinmux = <PINMUX_GPIO164__FUNC_B1_MSDC1_CLK>;
++			drive-strength = <MTK_DRIVE_6mA>;
++			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
++		};
++
++		pins-insert {
++			pinmux = <PINMUX_GPIO2__FUNC_B_GPIO2>;
++			bias-pull-up;
++		};
++	};
++
++	ethdefault: ethdefault {
++		pins-cc {
++			pinmux = <PINMUX_GPIO139__FUNC_B0_GBE_TXC>,
++				 <PINMUX_GPIO140__FUNC_I0_GBE_RXC>,
++				 <PINMUX_GPIO141__FUNC_I0_GBE_RXDV>,
++				 <PINMUX_GPIO142__FUNC_O_GBE_TXEN>;
++			drive-strength = <MTK_DRIVE_8mA>;
++		};
++
++		pins-mdio {
++			pinmux = <PINMUX_GPIO143__FUNC_O_GBE_MDC>,
++				 <PINMUX_GPIO144__FUNC_B1_GBE_MDIO>;
++			drive-strength = <MTK_DRIVE_8mA>;
++			input-enable;
++		};
++
++		pins-power {
++			pinmux = <PINMUX_GPIO145__FUNC_B_GPIO145>,
++				 <PINMUX_GPIO146__FUNC_B_GPIO146>;
++			output-high;
++		};
++
++		pins-rxd {
++			pinmux = <PINMUX_GPIO135__FUNC_I0_GBE_RXD3>,
++				 <PINMUX_GPIO136__FUNC_I0_GBE_RXD2>,
++				 <PINMUX_GPIO137__FUNC_I0_GBE_RXD1>,
++				 <PINMUX_GPIO138__FUNC_I0_GBE_RXD0>;
++			drive-strength = <MTK_DRIVE_8mA>;
++		};
++
++		pins-txd {
++			pinmux = <PINMUX_GPIO131__FUNC_O_GBE_TXD3>,
++				 <PINMUX_GPIO132__FUNC_O_GBE_TXD2>,
++				 <PINMUX_GPIO133__FUNC_O_GBE_TXD1>,
++				 <PINMUX_GPIO134__FUNC_O_GBE_TXD0>;
++			drive-strength = <MTK_DRIVE_8mA>;
++		};
++	};
++
++	ethsleep: ethsleep {
++		pins-cc {
++			pinmux = <PINMUX_GPIO139__FUNC_B_GPIO139>,
++				 <PINMUX_GPIO140__FUNC_B_GPIO140>,
++				 <PINMUX_GPIO141__FUNC_B_GPIO141>,
++				 <PINMUX_GPIO142__FUNC_B_GPIO142>;
++		};
++
++		pins-mdio {
++			pinmux = <PINMUX_GPIO143__FUNC_B_GPIO143>,
++				 <PINMUX_GPIO144__FUNC_B_GPIO144>;
++			input-disable;
++			bias-disable;
++		};
++
++		pins-rxd {
++			pinmux = <PINMUX_GPIO135__FUNC_B_GPIO135>,
++				 <PINMUX_GPIO136__FUNC_B_GPIO136>,
++				 <PINMUX_GPIO137__FUNC_B_GPIO137>,
++				 <PINMUX_GPIO138__FUNC_B_GPIO138>;
++		};
++
++		pins-txd {
++			pinmux = <PINMUX_GPIO131__FUNC_B_GPIO131>,
++				 <PINMUX_GPIO132__FUNC_B_GPIO132>,
++				 <PINMUX_GPIO133__FUNC_B_GPIO133>,
++				 <PINMUX_GPIO134__FUNC_B_GPIO134>;
++		};
++	};
 +};
 +
 +&i2c0 {
@@ -310,6 +458,8 @@ index 0000000000..1ed76ca57f
 +
 +	pca9554: gpio@3b {
 +		compatible = "nxp,pca9554";
++		gpio-controller;
++		#gpio-cells = <2>;
 +		reg = <0x3b>;
 +		status = "okay";
 +	};
@@ -396,3 +546,26 @@ index 0000000000..1ed76ca57f
 +&xhci2 {
 +	status = "okay";
 +};
++
++&eth {
++	phy-mode ="rgmii-rxid";
++	phy-handle = <&ethphy0>;
++	mediatek,tx-delay-ps = <2030>;
++	pinctrl-names = "default", "sleep";
++	pinctrl-0 = <&ethdefault>;
++	pinctrl-1 = <&ethsleep>;
++	status = "okay";
++
++	mdio {
++		compatible = "snps,dwmac-mdio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		ethphy0: ethphy0@1 {
++			compatible = "ethernet-phy-id001c.c916";
++			reg = <0x1>;
++		};
++	};
++};
+-- 
+2.47.1
+

@@ -1,7 +1,7 @@
-From e31179368392fbada8f96ac39f09c48871f3d324 Mon Sep 17 00:00:00 2001
+From 9c3bc2ac5a8149dfcc60b710a301e44330f711c0 Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
 Date: Mon, 13 Jan 2025 09:21:36 +0800
-Subject: [PATCH 1/4] mediatek: mt8188: query onboard dram memory size
+Subject: [PATCH 6/9] mediatek: mt8188: query onboard dram memory size
 
 query onboard dram memory size via ddr controller register
 ---

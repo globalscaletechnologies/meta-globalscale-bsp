@@ -1,7 +1,7 @@
-From 7fb3d78d3a522d5b93470f7f5865d77b8657f671 Mon Sep 17 00:00:00 2001
+From 140bc0362c68382fc0185a7d578ee5f7e4eba6cc Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
 Date: Tue, 21 Jan 2025 09:59:54 +0800
-Subject: [PATCH 3/4] cmd: axprog" Asix USB-to-Ethernet EEPROM programming
+Subject: [PATCH 8/9] cmd: axprog" Asix USB-to-Ethernet EEPROM programming
  utility
 
 This command allows users to configure and manage the MAC address
@@ -15,10 +15,10 @@ The utility can be used to read, write, and validate EEPROM data.
  create mode 100644 cmd/ax_programmer.c
 
 diff --git a/cmd/Kconfig b/cmd/Kconfig
-index 869804ab09..96e96c46eb 100644
+index c7cc8f675a..f14f56a5ba 100644
 --- a/cmd/Kconfig
 +++ b/cmd/Kconfig
-@@ -2128,6 +2128,18 @@ config CMD_UUID
+@@ -2154,6 +2154,18 @@ config CMD_UUID
  	  The two commands are very similar except for the endianness of the
  	  output.
  
@@ -38,7 +38,7 @@ index 869804ab09..96e96c46eb 100644
  
  source "cmd/ti/Kconfig"
 diff --git a/cmd/Makefile b/cmd/Makefile
-index db513d21c1..68013f53a1 100644
+index 06f2791adc..cc7a69bc69 100644
 --- a/cmd/Makefile
 +++ b/cmd/Makefile
 @@ -177,6 +177,7 @@ obj-$(CONFIG_CMD_UFS) += ufs.o

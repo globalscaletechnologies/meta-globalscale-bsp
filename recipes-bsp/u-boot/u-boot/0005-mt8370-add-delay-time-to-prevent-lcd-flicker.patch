@@ -1,7 +1,7 @@
-From 59120a8d9de23450fdd3b6dd9c739fde323f094a Mon Sep 17 00:00:00 2001
+From d4fc29c7de1e0b35e30b34a1253609bc7d1e545d Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
 Date: Thu, 26 Dec 2024 11:33:16 +0800
-Subject: [PATCH] mt8370: add delay time to prevent lcd flicker
+Subject: [PATCH 5/9] mt8370: add delay time to prevent lcd flicker
 
 ---
  board/mediatek/mt8370/mt8370_evk_panel.c | 4 +++-
@@ -24,5 +24,5 @@ index 2a7a467c72..474d587f3e 100644
  		dm_gpio_set_value(&panel_desc->reset_gpio, 0);
  		mdelay(15);
 -- 
-2.34.1
+2.47.1
 

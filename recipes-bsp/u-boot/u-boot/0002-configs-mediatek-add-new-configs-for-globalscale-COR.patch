@@ -1,22 +1,22 @@
-From de97ea33a6ea6768776e0fd30f87430e1ccbd66c Mon Sep 17 00:00:00 2001
+From 791b79c7164fcd9e9e58377ee775ea273b2798a3 Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
-Date: Wed, 17 Jul 2024 17:15:54 +0800
-Subject: [PATCH] configs: mediatek: add new configs for globalscale MT510SS
- evk board
+Date: Thu, 23 Jan 2025 09:41:02 +0800
+Subject: [PATCH 2/9] configs: mediatek: add new configs for globalscale
+ CORTADObin
 
-add new configs for globalscale MT510SS evk board
+add new configs for globalscale CORTADObin board
  - configs/globalscale_mt510ss_evk_defconfig
 ---
- configs/globalscale_mt510ss_evk_defconfig | 123 ++++++++++++++++++++++
- 1 file changed, 123 insertions(+)
+ configs/globalscale_mt510ss_evk_defconfig | 129 ++++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
  create mode 100644 configs/globalscale_mt510ss_evk_defconfig
 
 diff --git a/configs/globalscale_mt510ss_evk_defconfig b/configs/globalscale_mt510ss_evk_defconfig
 new file mode 100644
-index 0000000000..305af83090
+index 0000000000..8697103fab
 --- /dev/null
 +++ b/configs/globalscale_mt510ss_evk_defconfig
-@@ -0,0 +1,123 @@
+@@ -0,0 +1,129 @@
 +CONFIG_ARM=y
 +CONFIG_COUNTER_FREQUENCY=13000000
 +CONFIG_POSITION_INDEPENDENT=y
@@ -39,7 +39,7 @@ index 0000000000..305af83090
 +CONFIG_DISTRO_DEFAULTS=y
 +CONFIG_FIT=y
 +CONFIG_FIT_SIGNATURE=y
-+# CONFIG_ARCH_FIXUP_FDT_MEMORY is not set
++CONFIG_LEGACY_IMAGE_FORMAT=y
 +CONFIG_DEFAULT_FDT_FILE="gti-mt510ss-evk"
 +# CONFIG_DISPLAY_BOARDINFO is not set
 +# CONFIG_CMD_CONSOLE is not set
@@ -89,6 +89,10 @@ index 0000000000..305af83090
 +CONFIG_FASTBOOT_MMC_BOOT_SUPPORT=y
 +CONFIG_DM_I2C=y
 +CONFIG_SYS_I2C_MTK=y
++CONFIG_PHY_REALTEK=y
++CONFIG_PHY_ETHERNET_ID=y
++CONFIG_DWC_ETH_QOS=y
++CONFIG_DWC_ETH_QOS_MTK=y
 +# CONFIG_INPUT is not set
 +CONFIG_MISC=y
 +# CONFIG_MMC_QUIRKS is not set
@@ -140,3 +144,8 @@ index 0000000000..305af83090
 +CONFIG_EFI_CAPSULE_FIRMWARE_RAW=y
 +CONFIG_EFI_CAPSULE_AUTHENTICATE=y
 +CONFIG_LMB_MAX_REGIONS=16
++CONFIG_SYSINFO=y
++CONFIG_SYSINFO_SMBIOS=y
+-- 
+2.47.1
+

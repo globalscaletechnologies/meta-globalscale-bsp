@@ -1,7 +1,7 @@
-From 48683d2f3bc6efd23a8fb6b2c6a7c392400658bb Mon Sep 17 00:00:00 2001
+From 00063fc51524453430bb9325ec5889b10f01cfbb Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
-Date: Mon, 16 Sep 2024 08:20:40 +0800
-Subject: [PATCH] board: mt8370: turn on regulator at boot if
+Date: Thu, 23 Jan 2025 09:56:08 +0800
+Subject: [PATCH 4/9] board: mt8370: turn on regulator at boot if
  'regulator-boot-on' flag enabled
 
 ---
@@ -9,18 +9,18 @@ Subject: [PATCH] board: mt8370: turn on regulator at boot if
  1 file changed, 6 insertions(+)
 
 diff --git a/board/mediatek/mt8370/mt8370_evk.c b/board/mediatek/mt8370/mt8370_evk.c
-index 49763aab10..3045a44f51 100644
+index dccd4e72fd..a44745ef60 100644
 --- a/board/mediatek/mt8370/mt8370_evk.c
 +++ b/board/mediatek/mt8370/mt8370_evk.c
-@@ -11,6 +11,7 @@
+@@ -10,6 +10,7 @@
+ #include <iot_ab.h>
+ #include <net.h>
  #include <asm/io.h>
++#include <power/regulator.h>
  #include <linux/kernel.h>
  #include <linux/arm-smccc.h>
-+#include <power/regulator.h>
- #include <iot_ab.h>
- 
- #define MT8370_UPDATABLE_IMAGES	5
-@@ -125,6 +126,11 @@ int board_init(void)
+ #include <splash.h>
+@@ -179,6 +180,11 @@ int board_init(void)
  	struct udevice *dev;
  	int ret;
  
@@ -33,5 +33,5 @@ index 49763aab10..3045a44f51 100644
  		ret = uclass_get_device(UCLASS_USB_GADGET_GENERIC, 0, &dev);
  		if (ret) {
 -- 
-2.34.1
+2.47.1
 
