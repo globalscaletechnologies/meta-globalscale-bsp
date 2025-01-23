@@ -1,7 +1,7 @@
-From a322f190b9013da1234b6743e596e48842d598cd Mon Sep 17 00:00:00 2001
+From 748b64cb7c6fb18450f1c1fa97f047eaafa7085b Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
 Date: Mon, 23 Sep 2024 17:04:00 +0800
-Subject: [PATCH 3/5] sound: mt6359: add ext-amp control for Speaker
+Subject: [PATCH 2/8] sound: mt6359: add ext-amp control for Speaker
 
 add ext-amp control for Speaker and also add related dapm widget / routing
 ---
@@ -105,5 +105,5 @@ index 296ffa7f50b5..8ce7cb1eda28 100644
  
  #define CODEC_MT6359_NAME "mtk-codec-mt6359"
 -- 
-2.34.1
+2.47.1
 

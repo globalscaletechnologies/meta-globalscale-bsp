@@ -1,18 +1,15 @@
-From 28d313bce8dde5e4e21c8719519267a173cc0ff7 Mon Sep 17 00:00:00 2001
+From a1724604ede78132e28ff7881ade9eaa84f286af Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
-Date: Tue, 1 Oct 2024 07:56:36 +0800
-Subject: [PATCH] drm: mtk_dp: support DisplayPort direct output
+Date: Wed, 22 Jan 2025 11:51:49 +0800
+Subject: [PATCH 8/8] drm: mtk_dp: support DisplayPort direct output
 
 the patch is provide by mediatek to support DisplayPort direct output
 ---
- drivers/gpu/drm/mediatek/mtk_dp.c | 786 ++++++++++++++----------------
- 1 file changed, 379 insertions(+), 407 deletions(-)
- mode change 100644 => 100755 drivers/gpu/drm/mediatek/mtk_dp.c
+ drivers/gpu/drm/mediatek/mtk_dp.c | 793 +++++++++++++++---------------
+ 1 file changed, 386 insertions(+), 407 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_dp.c b/drivers/gpu/drm/mediatek/mtk_dp.c
-old mode 100644
-new mode 100755
-index bc8271a36cee..cea4ab0f24b2
+index 22f16f7b31bc..d2f9e915c3a3 100644
 --- a/drivers/gpu/drm/mediatek/mtk_dp.c
 +++ b/drivers/gpu/drm/mediatek/mtk_dp.c
 @@ -59,7 +59,9 @@ enum mtk_dp_train_state {
@@ -754,13 +751,13 @@ index bc8271a36cee..cea4ab0f24b2
  		break;
  	}
 -}
- 
+-
 -static int mtk_dp_train_handler(struct mtk_dp *mtk_dp)
 -{
 -	bool training_done = false;
 -	short max_retry = 50;
 -	int ret = 0;
--
+ 
 -	do {
 -		switch (mtk_dp->train_state) {
 -		case MTK_DP_TRAIN_STATE_STARTUP:
@@ -1257,20 +1254,22 @@ index bc8271a36cee..cea4ab0f24b2
  	rx_linkrate = (u32)mtk_dp->train_info.link_rate * 27000;
  	*num_input_fmts = 0;
  	input_fmts = kcalloc(ARRAY_SIZE(mt8195_input_fmts), sizeof(*input_fmts),
-@@ -2839,9 +2843,9 @@ static int mtk_dp_bridge_atomic_check(struct drm_bridge *bridge,
+@@ -2839,9 +2843,11 @@ static int mtk_dp_bridge_atomic_check(struct drm_bridge *bridge,
  
  	input_bus_format = bridge_state->input_bus_cfg.format;
  
 -	dev_dbg(mtk_dp->dev, "input format 0x%04x, output format 0x%04x\n",
 -		bridge_state->input_bus_cfg.format,
 -		bridge_state->output_bus_cfg.format);
++#if 0
 +	dev_info(mtk_dp->dev, "input format 0x%04x, output format 0x%04x\n",
 +		 bridge_state->input_bus_cfg.format,
 +		 bridge_state->output_bus_cfg.format);
++#endif
  
  	mtk_dp->input_fmt = input_bus_format;
  	if (mtk_dp->input_fmt == MEDIA_BUS_FMT_YUYV8_1X16)
-@@ -2852,40 +2856,6 @@ static int mtk_dp_bridge_atomic_check(struct drm_bridge *bridge,
+@@ -2852,40 +2858,6 @@ static int mtk_dp_bridge_atomic_check(struct drm_bridge *bridge,
  	return 0;
  }
  
@@ -1311,7 +1310,7 @@ index bc8271a36cee..cea4ab0f24b2
  static const struct drm_bridge_funcs mtk_dp_bridge_funcs = {
  	.atomic_check = mtk_dp_bridge_atomic_check,
  	.atomic_duplicate_state = drm_atomic_helper_bridge_duplicate_state,
-@@ -2900,7 +2870,6 @@ static const struct drm_bridge_funcs mtk_dp_bridge_funcs = {
+@@ -2900,7 +2872,6 @@ static const struct drm_bridge_funcs mtk_dp_bridge_funcs = {
  	.mode_valid = mtk_dp_bridge_mode_valid,
  	.get_edid = mtk_dp_get_edid,
  	.detect = mtk_dp_bdg_detect,
@@ -1319,13 +1318,18 @@ index bc8271a36cee..cea4ab0f24b2
  };
  
  static void mtk_dp_debounce_timer(struct timer_list *t)
-@@ -2925,11 +2894,11 @@ static int mtk_dp_audio_hw_params(struct device *dev, void *data,
- 		return -ENODEV;
- 	}
+@@ -2920,11 +2891,16 @@ static int mtk_dp_audio_hw_params(struct device *dev, void *data,
+ 	struct mtk_dp *mtk_dp = dev_get_drvdata(dev);
+ 	struct mtk_dp_audio_cfg cfg;
  
 -	mtk_dp->info.audio_cur_cfg.channels = params->cea.channels;
 -	mtk_dp->info.audio_cur_cfg.sample_rate = params->sample_rate;
 -	mtk_dp->info.audio_cur_cfg.word_length_bits = 24;
++	if (!mtk_dp->enabled) {
++		pr_err("%s, DP is not ready!\n", __func__);
++		return -ENODEV;
++	}
++
 +	cfg.channels = params->cea.channels;
 +	cfg.sample_rate = params->sample_rate;
 +	cfg.word_length_bits = 24;
@@ -1335,7 +1339,7 @@ index bc8271a36cee..cea4ab0f24b2
  
  	return 0;
  }
-@@ -2960,6 +2929,8 @@ static int mtk_dp_audio_get_eld(struct device *dev, void *data, uint8_t *buf,
+@@ -2955,6 +2931,8 @@ static int mtk_dp_audio_get_eld(struct device *dev, void *data, uint8_t *buf,
  	else
  		memset(buf, 0, len);
  
@@ -1344,7 +1348,7 @@ index bc8271a36cee..cea4ab0f24b2
  	return 0;
  }
  
-@@ -3021,34 +2992,46 @@ static int mtk_dp_probe(struct platform_device *pdev)
+@@ -3016,34 +2994,46 @@ static int mtk_dp_probe(struct platform_device *pdev)
  {
  	struct mtk_dp *mtk_dp;
  	struct device *dev = &pdev->dev;
@@ -1403,7 +1407,7 @@ index bc8271a36cee..cea4ab0f24b2
  	if (ret)
  		return ret;
  
-@@ -3065,14 +3048,14 @@ static int mtk_dp_probe(struct platform_device *pdev)
+@@ -3060,14 +3050,14 @@ static int mtk_dp_probe(struct platform_device *pdev)
  
  	mutex_init(&mtk_dp->dp_lock);
  	mutex_init(&mtk_dp->edid_lock);
@@ -1420,7 +1424,7 @@ index bc8271a36cee..cea4ab0f24b2
  		ret = mtk_dp_register_audio_driver(dev);
  		if (ret) {
  			dev_err(dev, "Failed to register audio driver: %d\n",
-@@ -3084,7 +3067,7 @@ static int mtk_dp_probe(struct platform_device *pdev)
+@@ -3079,7 +3069,7 @@ static int mtk_dp_probe(struct platform_device *pdev)
  	mtk_dp->phy_dev = platform_device_register_data(dev, "mediatek-dp-phy",
  							PLATFORM_DEVID_AUTO,
  							&mtk_dp->regs,
@@ -1429,7 +1433,7 @@ index bc8271a36cee..cea4ab0f24b2
  	if (IS_ERR(mtk_dp->phy_dev)) {
  		dev_err(dev, "Failed to create device mediatek-dp-phy: %ld\n",
  			PTR_ERR(mtk_dp->phy_dev));
-@@ -3102,19 +3085,18 @@ static int mtk_dp_probe(struct platform_device *pdev)
+@@ -3097,19 +3087,18 @@ static int mtk_dp_probe(struct platform_device *pdev)
  
  	mtk_dp->bridge.funcs = &mtk_dp_bridge_funcs;
  	mtk_dp->bridge.of_node = dev->of_node;
@@ -1453,7 +1457,7 @@ index bc8271a36cee..cea4ab0f24b2
  	pm_runtime_enable(dev);
  	pm_runtime_get_sync(dev);
  
-@@ -3146,13 +3128,8 @@ static int mtk_dp_suspend(struct device *dev)
+@@ -3141,13 +3130,8 @@ static int mtk_dp_suspend(struct device *dev)
  		usleep_range(2000, 3000);
  	}
  
@@ -1468,7 +1472,7 @@ index bc8271a36cee..cea4ab0f24b2
  
  	pm_runtime_put_sync(dev);
  
-@@ -3167,12 +3144,7 @@ static int mtk_dp_resume(struct device *dev)
+@@ -3162,12 +3146,7 @@ static int mtk_dp_resume(struct device *dev)
  
  	mtk_dp_init_port(mtk_dp);
  	mtk_dp_power_enable(mtk_dp);
@@ -1483,5 +1487,5 @@ index bc8271a36cee..cea4ab0f24b2
  	return 0;
  }
 -- 
-2.34.1
+2.47.1
 

@@ -1,14 +1,14 @@
-From e6b2b719f90a32549bc680b9e161a682ea58f7e5 Mon Sep 17 00:00:00 2001
+From 048ae3f70d99144856c601d97aeae34d993af57d Mon Sep 17 00:00:00 2001
 From: Jason Hung <jhung@globalscaletechnologies.com>
-Date: Mon, 22 Jul 2024 09:17:19 +0800
-Subject: [PATCH] dts: mediatek: add Globalscale MT510SS evk board
+Date: Wed, 22 Jan 2025 11:31:28 +0800
+Subject: [PATCH 1/8] dts: mediatek: add Globalscale MT510SS evk board
 
 Add Globalscale MT510SS EVK board support.
 This EVK evaluation board uses MediaTek's MT8370 SoC (Genio-510).
 ---
  arch/arm64/boot/dts/mediatek/Makefile         |    1 +
- .../boot/dts/mediatek/gti-mt510ss-evk.dts     | 1499 +++++++++++++++++
- 2 files changed, 1500 insertions(+)
+ .../boot/dts/mediatek/gti-mt510ss-evk.dts     | 1438 +++++++++++++++++
+ 2 files changed, 1439 insertions(+)
  create mode 100644 arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
 
 diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
@@ -22,10 +22,10 @@ index b72b6d08c493..452a1e86738b 100644
 +dtb-$(CONFIG_ARCH_MEDIATEK) += gti-mt510ss-evk.dtb
 diff --git a/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
 new file mode 100644
-index 000000000000..b5c27718a7dd
+index 000000000000..27cfc52716e3
 --- /dev/null
 +++ b/arch/arm64/boot/dts/mediatek/gti-mt510ss-evk.dts
-@@ -0,0 +1,1499 @@
+@@ -0,0 +1,1438 @@
 +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
 +/*
 + * Copyright (C) 2022 MediaTek Inc.
@@ -157,6 +157,27 @@ index 000000000000..b5c27718a7dd
 +		enable-active-high;
 +	};
 +
++	fcpo_1v8: regulator@1 {
++		compatible = "regulator-fixed";
++		regulator-name = "fcpo_1v8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&pio 12 0>; /* 5G FULL_CARD_POWER_OFF */
++		startup-delay-us = <15000>;
++		enable-active-high;
++	};
++
++	onboard_m2: regulator@2 {
++		compatible = "regulator-fixed";
++		regulator-name = "5g_reset";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&pio 113 0>; /* M2_RESET */
++		vin-supply = <&fcpo_1v8>;
++		enable-active-high;
++		regulator-always-on;
++	};
++
 +	hub3v3: regulator@4 {
 +		compatible = "regulator-fixed";
 +		regulator-name = "vhub3v3";
@@ -208,29 +229,37 @@ index 000000000000..b5c27718a7dd
 +		regulator-always-on;
 +	};
 +
-+	sdio_fixed_3v3: regulator@2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "sdio_card";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		enable-active-high;
-+		regulator-always-on;
-+	};
-+
-+	sdio_fixed_1v8: regulator@3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "sdio_io";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		enable-active-high;
-+		regulator-always-on;
-+	};
-+
 +	dsi0_en: dsi0-en {
 +		compatible = "regulator-fixed";
 +		regulator-name = "lcm1_en";
 +		enable-active-high;
 +		gpio = <&expander0 7 GPIO_ACTIVE_HIGH>;
++	};
++
++	vmch_ext: vmch-ext {
++		compatible = "regulator-fixed";
++		regulator-name = "vmch_ext";
++		regulator-min-microvolt = <3100000>;
++		regulator-max-microvolt = <3100000>;
++		enable-active-high;
++		gpio = <&pio 4 GPIO_ACTIVE_HIGH>;
++	};
++
++	dp_3v3_power: dp-3v3-power {
++		pinctrl-names = "default";
++		pinctrl-0 = <&dp_3v3_power_en_pin>;
++		compatible = "regulator-fixed";
++		regulator-name = "dp_3v3_power";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&pio 14 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-always-on;
++	};
++
++	mtk_fsource: fsource {
++		compatible = "mtk-fsource";
++		vfsource-supply = <&mt6359_vefuse_ldo_reg>;
 +	};
 +
 +	amic_codec: amic-codec {
@@ -491,7 +520,7 @@ index 000000000000..b5c27718a7dd
 +
 +	is31_sdb_pins: is31-sdb-pins {
 +		pins-sdb {
-+			pinmux = <PINMUX_GPIO77__FUNC_B_GPIO77>;
++			pinmux = <PINMUX_GPIO73__FUNC_B_GPIO73>;
 +			output-high;
 +		};
 +	};
@@ -500,6 +529,13 @@ index 000000000000..b5c27718a7dd
 +		pins-cmd-dat {
 +			pinmux = <PINMUX_GPIO46__FUNC_I0_DP_TX_HPD>;
 +			bias-pull-up;
++		};
++	};
++
++	dp_3v3_power_en_pin: dp-3v3-power-en-pin {
++		pins1 {
++			pinmux = <PINMUX_GPIO14__FUNC_B_GPIO14>;
++			output-high;
 +		};
 +	};
 +
@@ -594,8 +630,8 @@ index 000000000000..b5c27718a7dd
 +
 +	uart2_pins: uart2-pins {
 +		pins {
-+			pinmux = <PINMUX_GPIO35__FUNC_O_UTXD2>,
-+				 <PINMUX_GPIO36__FUNC_I1_URXD2>;
++			pinmux = <PINMUX_GPIO79__FUNC_O_UTXD2>,
++				 <PINMUX_GPIO80__FUNC_I1_URXD2>;
 +			bias-pull-up;
 +		};
 +	};
@@ -660,14 +696,6 @@ index 000000000000..b5c27718a7dd
 +				 <PINMUX_GPIO67__FUNC_B1_SCL6>;
 +			bias-pull-up = <MTK_PULL_SET_RSEL_011>;
 +			mediatek,drive-strength-adv = <7>;
-+		};
-+	};
-+
-+	rt1715_int: rt1715_int_pin {
-+		pins_cmd0_dat {
-+			pinmux = <PINMUX_GPIO12__FUNC_B_GPIO12>;
-+			bias-pull-up;
-+			input-enable;
 +		};
 +	};
 +
@@ -804,77 +832,6 @@ index 000000000000..b5c27718a7dd
 +		};
 +	};
 +
-+	mmc2_pins_default: mmc2default {
-+		pins-clk {
-+			pinmux = <PINMUX_GPIO170__FUNC_B1_MSDC2_CLK>;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-+		};
-+
-+		pins-cmd-dat {
-+			pinmux = <PINMUX_GPIO169__FUNC_B1_MSDC2_CMD>,
-+				 <PINMUX_GPIO171__FUNC_B1_MSDC2_DAT0>,
-+				 <PINMUX_GPIO172__FUNC_B1_MSDC2_DAT1>,
-+				 <PINMUX_GPIO173__FUNC_B1_MSDC2_DAT2>,
-+				 <PINMUX_GPIO174__FUNC_B1_MSDC2_DAT3>;
-+			input-enable;
-+			drive-strength = <MTK_DRIVE_6mA>;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-+		};
-+
-+		pins-pcm {
-+			pinmux = <PINMUX_GPIO123__FUNC_O_PCM_DO>;
-+		};
-+
-+		wcn-3v3-en {
-+			pinmux = <PINMUX_GPIO74__FUNC_B_GPIO74>;
-+			output-high;
-+		};
-+	};
-+
-+	mmc2_pins_uhs: mmc2uhs {
-+		pins-clk {
-+			pinmux = <PINMUX_GPIO170__FUNC_B1_MSDC2_CLK>;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-+		};
-+
-+		pins-cmd-dat {
-+			pinmux = <PINMUX_GPIO169__FUNC_B1_MSDC2_CMD>,
-+				 <PINMUX_GPIO171__FUNC_B1_MSDC2_DAT0>,
-+				 <PINMUX_GPIO172__FUNC_B1_MSDC2_DAT1>,
-+				 <PINMUX_GPIO173__FUNC_B1_MSDC2_DAT2>,
-+				 <PINMUX_GPIO174__FUNC_B1_MSDC2_DAT3>;
-+			input-enable;
-+			drive-strength = <MTK_DRIVE_6mA>;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-+		};
-+	};
-+
-+	mmc2_pins_eint: dat1-eint {
-+		pins-dat1 {
-+			pinmux = <PINMUX_GPIO172__FUNC_B_GPIO172>;
-+			input-enable;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-+		};
-+	};
-+
-+	mmc2_pins_dat1: sdio-dat1 {
-+		pins-dat1 {
-+			pinmux = <PINMUX_GPIO172__FUNC_B1_MSDC2_DAT1>;
-+			input-enable;
-+			drive-strength = <MTK_DRIVE_6mA>;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-+		};
-+	};
-+
-+	wifi_pins_pwrseq: wifipwrseq {
-+		pins-wifi-enable {
-+			pinmux = <PINMUX_GPIO72__FUNC_B_GPIO72>;
-+			output-low;
-+		};
-+	};
-+
 +	spi0_pins: spi0-pins {
 +		pins-spi {
 +			pinmux = <PINMUX_GPIO69__FUNC_O_SPIM0_CSB>,
@@ -911,6 +868,11 @@ index 000000000000..b5c27718a7dd
 +				 <PINMUX_GPIO48__FUNC_O_PERSTN>,
 +				 <PINMUX_GPIO49__FUNC_B1_CLKREQN>;
 +			bias-pull-up;
++		};
++
++		wcn-3v3-en {
++			pinmux = <PINMUX_GPIO74__FUNC_B_GPIO74>;
++			output-high;
 +		};
 +	};
 +
@@ -1030,7 +992,7 @@ index 000000000000..b5c27718a7dd
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +		reg = <0x64>;
-+		shutdown-gpios = <&pio 77 GPIO_ACTIVE_HIGH>;
++		shutdown-gpios = <&pio 73 GPIO_ACTIVE_HIGH>;
 +
 +		led1r: led@1 {
 +			label = "led1:red";
@@ -1142,6 +1104,7 @@ index 000000000000..b5c27718a7dd
 +&mt6359codec {
 +	mediatek,mic-type-0 = <1>; /* ACC */
 +	mediatek,mic-type-1 = <3>; /* DCC */
++	amp-gpio = <&pio 13 GPIO_ACTIVE_HIGH>;
 +};
 +
 +&mt6359_vbbck_ldo_reg {
@@ -1187,7 +1150,7 @@ index 000000000000..b5c27718a7dd
 +&uart2 {
 +	pinctrl-0 = <&uart2_pins>;
 +	pinctrl-names = "default";
-+	status = "disabled";
++	status = "okay";
 +};
 +
 +&mipi_tx0 {
@@ -1227,7 +1190,7 @@ index 000000000000..b5c27718a7dd
 +	no-mmc;
 +	no-sdio;
 +	cd-gpios = <&pio 2 GPIO_ACTIVE_LOW>;
-+	vmmc-supply = <&mt6359_vpa_buck_reg>;
++	vmmc-supply = <&vmch_ext>;
 +	vqmmc-supply = <&mt6359_vsim1_ldo_reg>;
 +};
 +
@@ -1237,40 +1200,6 @@ index 000000000000..b5c27718a7dd
 +
 +&mt6359_vsim1_ldo_reg {
 +	regulator-enable-ramp-delay = <480>;
-+};
-+
-+&wifi_pwrseq {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&wifi_pins_pwrseq>;
-+
-+	reset-gpios = <&pio 72 1>;
-+	post-power-on-delay-ms = <200>;
-+};
-+
-+&mmc2 {
-+	status = "okay";
-+	pinctrl-names = "default", "state_uhs", "state_eint",
-+					"state_dat1";
-+	pinctrl-0 = <&mmc2_pins_default>;
-+	pinctrl-1 = <&mmc2_pins_uhs>;
-+	pinctrl-2 = <&mmc2_pins_eint>;
-+	pinctrl-3 = <&mmc2_pins_dat1>;
-+	eint-gpios = <&pio 172 0>;
-+	bus-width = <4>;
-+	max-frequency = <200000000>;
-+	cap-sd-highspeed;
-+	sd-uhs-sdr104;
-+	keep-power-in-suspend;
-+	enable-sdio-wakeup;
-+	cap-sdio-async-int;
-+	cap-sdio-irq;
-+	no-mmc;
-+	no-sd;
-+	non-removable;
-+	vmmc-supply = <&sdio_fixed_3v3>;
-+	vqmmc-supply = <&sdio_fixed_1v8>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
 +};
 +
 +&mt6359_vcn18_ldo_reg {
@@ -1300,7 +1229,7 @@ index 000000000000..b5c27718a7dd
 +	mediatek,pad-select = <0>;
 +	#address-cells = <1>;
 +	#size-cells = <0>;
-+	status = "okay";
++	status = "disabled";
 +
 +	spidev@0 {
 +		compatible = "mediatek,aiot-board";
@@ -1466,6 +1395,8 @@ index 000000000000..b5c27718a7dd
 +	audio-routing =
 +		"Headphone", "Headphone L",
 +		"Headphone", "Headphone R",
++		"Speaker", "Ext Spk L",
++		"Speaker", "Ext Spk R",
 +		"AIN1", "Headset Mic",
 +		"DMIC_INPUT", "AP DMIC",
 +		"AP DMIC", "AUDGLB",
@@ -1484,6 +1415,10 @@ index 000000000000..b5c27718a7dd
 +
 +		codec-1 {
 +			sound-dai = <&amic_codec>;
++		};
++
++		codec-2 {
++			sound-dai = <&accdet>;
 +		};
 +	};
 +
@@ -1518,6 +1453,10 @@ index 000000000000..b5c27718a7dd
 +	};
 +};
 +
++&accdet {
++	mediatek,eint-level-pol = <IRQ_TYPE_LEVEL_LOW>;
++};
++
 +&cam_vcore {
 +	domain-supply = <&mt6359_vproc1_buck_reg>;
 +};
@@ -1525,3 +1464,6 @@ index 000000000000..b5c27718a7dd
 +&img_vcore {
 +	domain-supply = <&mt6359_vproc1_buck_reg>;
 +};
+-- 
+2.47.1
+

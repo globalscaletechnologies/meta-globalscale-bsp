@@ -1,7 +1,7 @@
-From 28f6855653973f56962c6a7c32a25d174f5245a3 Mon Sep 17 00:00:00 2001
+From 4ad70d9c2e3a4d499dda53e38b421b57ce7be086 Mon Sep 17 00:00:00 2001
 From: jerry meng <jerry-meng@foxmail.com>
 Date: Mon, 5 Sep 2022 14:35:33 +0800
-Subject: [PATCH] USB: serial: option: add Quectel RM520N
+Subject: [PATCH 5/8] USB: serial: option: add Quectel RM520N
 
 add support for Quectel RM520N which is based on Qualcomm SDX62 chip.
 
@@ -64,5 +64,5 @@ index e29530a220f5..5b4fca9070ed 100644
  	{ USB_DEVICE_AND_INTERFACE_INFO(QUECTEL_VENDOR_ID, QUECTEL_PRODUCT_EC200T, 0xff, 0, 0) },
  	{ USB_DEVICE_AND_INTERFACE_INFO(QUECTEL_VENDOR_ID, QUECTEL_PRODUCT_RM500K, 0xff, 0x00, 0x00) },
 -- 
-2.34.1
+2.47.1
 

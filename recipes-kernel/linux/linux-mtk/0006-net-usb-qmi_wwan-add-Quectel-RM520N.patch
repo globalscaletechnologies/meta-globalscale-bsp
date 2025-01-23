@@ -1,7 +1,7 @@
-From b12a5d8e5e5287827141b570d08343ffad4f031a Mon Sep 17 00:00:00 2001
+From db517823e0f4e1281c37b1d5258bcc856c6ae626 Mon Sep 17 00:00:00 2001
 From: "jerry.meng" <jerry-meng@foxmail.com>
 Date: Mon, 5 Sep 2022 09:24:52 +0800
-Subject: [PATCH] net: usb: qmi_wwan: add Quectel RM520N
+Subject: [PATCH 6/8] net: usb: qmi_wwan: add Quectel RM520N
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -58,5 +58,5 @@ index 0c7f02ca6822..382ed5fdc4b6 100644
  	/* 3. Combined interface devices matching on interface number */
  	{QMI_FIXED_INTF(0x0408, 0xea42, 4)},	/* Yota / Megafon M100-1 */
 -- 
-2.34.1
+2.47.1
 
