@@ -13,3 +13,7 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
 
 # Board specific config fragments
 SRC_URI:append:globalscale-mt510ss-evk = " file://globalscale-mt510ss-evk.cfg "
+
+SRC_URI:append = " \
+	${@bb.utils.contains('DISTRO_FEATURES', 'virtualization', 'file://virtualization.cfg', '', d)} \
+"
