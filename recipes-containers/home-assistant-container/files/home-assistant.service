@@ -1,0 +1,15 @@
+[Unit]
+Description=Load and start Home Assistant Container image at boot
+After=docker.service
+Requires=docker.service docker.socket
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStartPre=/usr/bin/homeassistant-image load
+ExecStart=/usr/bin/homeassistant-image start
+ExecStop=/usr/bin/homeassistant-image stop
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
