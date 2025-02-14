@@ -9,6 +9,7 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0006-net-usb-qmi_wwan-add-Quectel-RM520N.patch \
     file://0007-net-ax88179-restrict-the-AX88179-to-support-only-ver.patch \
     file://0008-drm-mtk_dp-support-DisplayPort-direct-output.patch \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'homeassistant', 'file://0009-input-mtk-pmic-keys-hacking-to-send-alt-keycode-for-.patch', '', d)} \
 "
 
 # Board specific config fragments
