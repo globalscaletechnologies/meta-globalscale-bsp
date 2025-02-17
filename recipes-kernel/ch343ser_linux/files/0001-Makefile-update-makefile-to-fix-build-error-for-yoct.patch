@@ -1,0 +1,54 @@
+From 5db46c4e1f495ee00c851a6c6b556b289431d6fd Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 17 Feb 2025 09:22:03 +0800
+Subject: [PATCH] Makefile: update makefile to fix build error for yocto
+
+---
+ driver/Makefile | 32 +++++++++++---------------------
+ 1 file changed, 11 insertions(+), 21 deletions(-)
+
+diff --git a/driver/Makefile b/driver/Makefile
+index a46b5fd..72dafd2 100644
+--- a/driver/Makefile
++++ b/driver/Makefile
+@@ -1,26 +1,16 @@
+ CONFIG_MODULE_SIG=n
+ 
+-ifeq ($(KERNELRELEASE), )
+-KERNELDIR := /lib/modules/$(shell uname -r)/build
++obj-m := ch343.o
++
++KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+ PWD := $(shell pwd)
+-default:
+-	$(MAKE) -C $(KERNELDIR)  M=$(PWD)  
++
++all:
++	$(MAKE) -C $(KERNELDIR) M=$(PWD)  
++
+ clean:
++	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
+ 	rm -rf *.mk .tmp_versions Module.symvers *.mod.c *.o *.ko .*.cmd Module.markers modules.order *.a *.mod
+-load:
+-	insmod ch343.ko
+-unload:
+-	rmmod ch343
+-install: default
+-	insmod ch343.ko || true
+-	mkdir -p /lib/modules/$(shell uname -r)/kernel/drivers/usb/serial || true
+-	cp -f ./ch343.ko /lib/modules/$(shell uname -r)/kernel/drivers/usb/serial || true
+-	@/bin/echo -e "ch343" >> /etc/modules || true
+-	depmod -a
+-uninstall:
+-	rmmod ch343 || true
+-	rm -rf /lib/modules/$(shell uname -r)/kernel/drivers/usb/serial/ch343.ko || true
+-	depmod -a
+-else
+-	obj-m := ch343.o
+-endif
++
++install:
++	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules_install
+-- 
+2.47.1
+
