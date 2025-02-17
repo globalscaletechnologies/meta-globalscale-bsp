@@ -1,0 +1,151 @@
+From 0841f1bc8c71cf95908f82eaee2d4160e4847982 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 17 Feb 2025 14:34:09 +0800
+Subject: [PATCH] keyboard: add gradient color effect
+
+---
+ clients/keyboard.c | 120 ++++++++++++++++++++++++---------------------
+ 1 file changed, 63 insertions(+), 57 deletions(-)
+
+diff --git a/clients/keyboard.c b/clients/keyboard.c
+index 643980d..ce7768f 100644
+--- a/clients/keyboard.c
++++ b/clients/keyboard.c
+@@ -308,58 +308,67 @@ label_from_key(struct keyboard *keyboard,
+ 
+ static void
+ draw_key(struct keyboard *keyboard,
+-	 const struct key *key,
+-	 cairo_t *cr,
+-	 unsigned int row,
+-	 unsigned int col,
+-	 bool pressed)
++         const struct key *key,
++         cairo_t *cr,
++         unsigned int row,
++         unsigned int col,
++         bool pressed)
+ {
+-	const char *label;
+-	cairo_text_extents_t extents;
+-
+-	cairo_save(cr);
+-
+-	// Rounded rectangle for the key
+-	cairo_new_sub_path(cr);
+-	cairo_arc(cr, col * key_width + key_rounding,
+-			  row * key_height + key_rounding, key_rounding, M_PI, 1.5 * M_PI);
+-	cairo_arc(cr, col * key_width + key->width * key_width - key_rounding,
+-			  row * key_height + key_rounding, key_rounding, 1.5 * M_PI, 2 * M_PI);
+-	cairo_arc(cr, col * key_width + key->width * key_width - key_rounding,
+-			  row * key_height + key_height - key_rounding, key_rounding, 0, 0.5 * M_PI);
+-	cairo_arc(cr, col * key_width + key_rounding,
+-			  row * key_height + key_height - key_rounding, key_rounding, 0.5 * M_PI, M_PI);
+-	cairo_close_path(cr);
+-
+-	if (pressed) { // Highlight if pressed
+-		cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0); // Light gray highlight
+-	} else {
+-		cairo_set_source_rgba(cr, 0.95, 0.95, 0.95, 1.0); // Slightly darker background
+-	}
+-
+-	cairo_fill_preserve(cr); // Fill the rounded rectangle
+-
+-	/* Paint frame */
+-	cairo_set_line_width(cr, 1);
+-	cairo_set_source_rgb(cr, 0.6, 0.6, 0.6); // Darker gray border
+-	cairo_stroke(cr);
+-
+-	/* Paint text */
+-	label = label_from_key(keyboard, key);
+-	cairo_text_extents(cr, label, &extents);
+-
+-	cairo_set_source_rgb(cr, 0.1, 0.1, 0.1); // Dark text color
+-
+-	cairo_translate(cr,
+-					col * key_width + key_padding,
+-					row * key_height + key_padding);
+-	cairo_translate(cr,
+-					(key->width * key_width - extents.width - 2 * key_padding) / 2,
+-					(key_height - extents.y_bearing - 2 * key_padding) / 2);
+-
+-	cairo_show_text(cr, label);
+-
+-	cairo_restore(cr);
++    const char *label;
++    cairo_text_extents_t extents;
++    double x = col * key_width;
++    double y = row * key_height;
++    double width = key->width * key_width;
++    double height = key_height;
++    double radius = key_rounding;
++
++    cairo_save(cr);
++
++    // Rounded rectangle for the key
++    cairo_new_sub_path(cr);
++    cairo_arc(cr, x + radius, y + radius, radius, M_PI, 1.5 * M_PI);
++    cairo_arc(cr, x + width - radius, y + radius, radius, 1.5 * M_PI, 2 * M_PI);
++    cairo_arc(cr, x + width - radius, y + height - radius, radius, 0, 0.5 * M_PI);
++    cairo_arc(cr, x + radius, y + height - radius, radius, 0.5 * M_PI, M_PI);
++    cairo_close_path(cr);
++
++    // Gradient background
++    cairo_pattern_t *gradient;
++    if (pressed) {
++        gradient = cairo_pattern_create_linear(x, y, x, y + height);
++        cairo_pattern_add_color_stop_rgba(gradient, 0.0, 0.8, 0.8, 0.8, 1.0); // Pressed color start
++        cairo_pattern_add_color_stop_rgba(gradient, 1.0, 0.7, 0.7, 0.7, 1.0); // Pressed color end
++    } else {
++        gradient = cairo_pattern_create_linear(x, y, x, y + height);
++        cairo_pattern_add_color_stop_rgba(gradient, 0.0, 1.0, 1.0, 1.0, 0.95); // Normal color start
++        cairo_pattern_add_color_stop_rgba(gradient, 1.0, 0.95, 0.95, 0.95, 0.95); // Normal color end
++    }
++    cairo_set_source(cr, gradient);
++    cairo_fill_preserve(cr);  // Keep path for border
++    cairo_pattern_destroy(gradient);
++
++    // Subtle border
++    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.1);
++    cairo_set_line_width(cr, 1);
++    cairo_stroke(cr);
++
++    // Draw text
++    label = label_from_key(keyboard, key);
++    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
++    cairo_set_font_size(cr, height * 0.3);
++
++    if (pressed) {
++        cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.8); // Dark text when pressed
++    } else {
++        cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.8); // Normal text color
++    }
++    cairo_text_extents(cr, label, &extents);
++    cairo_move_to(cr,
++                x + (width - extents.width) / 2,
++                y + (height + extents.height) / 2);
++    cairo_show_text(cr, label);
++
++    cairo_restore(cr);
+ }
+ 
+ static const struct layout *
+@@ -398,15 +407,12 @@ redraw_handler(struct widget *widget, void *data)
+ 	cairo_rectangle(cr, allocation.x, allocation.y, allocation.width, allocation.height);
+ 	cairo_clip(cr);
+ 
+-	cairo_select_font_face(cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+-	cairo_set_font_size(cr, 24);
+-
+ 	cairo_translate(cr, allocation.x, allocation.y);
+ 
++	// Draw semi-transparent background
+ 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+-    cairo_set_source_rgba(cr, 0.9, 0.9, 0.9, 1.0); // Lighter background for keyboard
+-    cairo_rectangle(cr, 0, 0, layout->columns * key_width, layout->rows * key_height);
+-    cairo_paint(cr);
++	cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.85);
++	cairo_paint(cr);
+ 
+ 	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+ 

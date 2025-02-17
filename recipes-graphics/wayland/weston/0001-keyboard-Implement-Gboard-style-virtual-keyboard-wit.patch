@@ -1,0 +1,194 @@
+From f7a4c6f67702b54dd1119ea84e3b8a5af0a71383 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 17 Feb 2025 14:06:50 +0800
+Subject: [PATCH] keyboard: Implement Gboard-style virtual keyboard with key
+ press highlighting function
+
+This patch redesigns the virtual keyboard to like the style of Google's Gboard keyboard,
+and also adds key press highlighting to provide better user feedback.
+---
+ clients/keyboard.c | 80 ++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 56 insertions(+), 24 deletions(-)
+
+diff --git a/clients/keyboard.c b/clients/keyboard.c
+index deddd78..643980d 100644
+--- a/clients/keyboard.c
++++ b/clients/keyboard.c
+@@ -255,8 +255,10 @@ static const char *style_labels[] = {
+ 	"incorrect"
+ };
+ 
+-static const double key_width = 60;
+-static const double key_height = 50;
++static const double key_width = 100;
++static const double key_height = 80;
++static const double key_rounding = 8.0; // Corner rounding for keys
++static const double key_padding = 4.0; // Padding around key content
+ 
+ enum keyboard_state {
+ 	KEYBOARD_STATE_DEFAULT,
+@@ -270,6 +272,7 @@ struct keyboard {
+ 	struct widget *widget;
+ 
+ 	enum keyboard_state state;
++	bool *pressed_keys;
+ };
+ 
+ static void __attribute__ ((format (printf, 1, 2)))
+@@ -308,34 +311,52 @@ draw_key(struct keyboard *keyboard,
+ 	 const struct key *key,
+ 	 cairo_t *cr,
+ 	 unsigned int row,
+-	 unsigned int col)
++	 unsigned int col,
++	 bool pressed)
+ {
+ 	const char *label;
+ 	cairo_text_extents_t extents;
+ 
+ 	cairo_save(cr);
+-	cairo_rectangle(cr,
+-			col * key_width, row * key_height,
+-			key->width * key_width, key_height);
+-	cairo_clip(cr);
++
++	// Rounded rectangle for the key
++	cairo_new_sub_path(cr);
++	cairo_arc(cr, col * key_width + key_rounding,
++			  row * key_height + key_rounding, key_rounding, M_PI, 1.5 * M_PI);
++	cairo_arc(cr, col * key_width + key->width * key_width - key_rounding,
++			  row * key_height + key_rounding, key_rounding, 1.5 * M_PI, 2 * M_PI);
++	cairo_arc(cr, col * key_width + key->width * key_width - key_rounding,
++			  row * key_height + key_height - key_rounding, key_rounding, 0, 0.5 * M_PI);
++	cairo_arc(cr, col * key_width + key_rounding,
++			  row * key_height + key_height - key_rounding, key_rounding, 0.5 * M_PI, M_PI);
++	cairo_close_path(cr);
++
++	if (pressed) { // Highlight if pressed
++		cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0); // Light gray highlight
++	} else {
++		cairo_set_source_rgba(cr, 0.95, 0.95, 0.95, 1.0); // Slightly darker background
++	}
++
++	cairo_fill_preserve(cr); // Fill the rounded rectangle
+ 
+ 	/* Paint frame */
+-	cairo_rectangle(cr,
+-			col * key_width, row * key_height,
+-			key->width * key_width, key_height);
+-	cairo_set_line_width(cr, 3);
++	cairo_set_line_width(cr, 1);
++	cairo_set_source_rgb(cr, 0.6, 0.6, 0.6); // Darker gray border
+ 	cairo_stroke(cr);
+ 
+ 	/* Paint text */
+ 	label = label_from_key(keyboard, key);
+ 	cairo_text_extents(cr, label, &extents);
+ 
++	cairo_set_source_rgb(cr, 0.1, 0.1, 0.1); // Dark text color
++
+ 	cairo_translate(cr,
+-			col * key_width,
+-			row * key_height);
++					col * key_width + key_padding,
++					row * key_height + key_padding);
+ 	cairo_translate(cr,
+-			(key->width * key_width - extents.width) / 2,
+-			(key_height - extents.y_bearing) / 2);
++					(key->width * key_width - extents.width - 2 * key_padding) / 2,
++					(key_height - extents.y_bearing - 2 * key_padding) / 2);
++
+ 	cairo_show_text(cr, label);
+ 
+ 	cairo_restore(cr);
+@@ -378,20 +399,20 @@ redraw_handler(struct widget *widget, void *data)
+ 	cairo_clip(cr);
+ 
+ 	cairo_select_font_face(cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+-	cairo_set_font_size(cr, 16);
++	cairo_set_font_size(cr, 24);
+ 
+ 	cairo_translate(cr, allocation.x, allocation.y);
+ 
+ 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+-	cairo_set_source_rgba(cr, 1, 1, 1, 0.75);
+-	cairo_rectangle(cr, 0, 0, layout->columns * key_width, layout->rows * key_height);
+-	cairo_paint(cr);
++    cairo_set_source_rgba(cr, 0.9, 0.9, 0.9, 1.0); // Lighter background for keyboard
++    cairo_rectangle(cr, 0, 0, layout->columns * key_width, layout->rows * key_height);
++    cairo_paint(cr);
+ 
+ 	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+ 
+ 	for (i = 0; i < layout->count; ++i) {
+ 		cairo_set_source_rgb(cr, 0, 0, 0);
+-		draw_key(keyboard, &layout->keys[i], cr, row, col);
++		draw_key(keyboard, &layout->keys[i], cr, row, col, keyboard->pressed_keys[i]);
+ 		col += layout->keys[i].width;
+ 		if (col >= layout->columns) {
+ 			row += 1;
+@@ -535,7 +556,8 @@ append(char *s1, const char *s2)
+ }
+ 
+ static void
+-keyboard_handle_key(struct keyboard *keyboard, uint32_t time, const struct key *key, struct input *input, enum wl_pointer_button_state state)
++keyboard_handle_key(struct keyboard *keyboard, uint32_t time,
++	const struct key *key, struct input *input, enum wl_pointer_button_state state, int key_index)
+ {
+ 	const char *label = NULL;
+ 
+@@ -661,6 +683,14 @@ keyboard_handle_key(struct keyboard *keyboard, uint32_t time, const struct key *
+ 			virtual_keyboard_send_preedit(keyboard->keyboard, -1);
+ 			break;
+ 	}
++
++	if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
++		keyboard->pressed_keys[key_index] = true; // Set pressed state
++	} else {
++		keyboard->pressed_keys[key_index] = false; // Clear pressed state
++	}
++
++	widget_schedule_redraw(keyboard->widget); // Redraw after key press/release
+ }
+ 
+ static void
+@@ -693,12 +723,12 @@ button_handler(struct widget *widget,
+ 	for (i = 0; i < layout->count; ++i) {
+ 		col -= layout->keys[i].width;
+ 		if (col < 0) {
+-			keyboard_handle_key(keyboard, time, &layout->keys[i], input, state);
++			keyboard_handle_key(keyboard, time, &layout->keys[i], input, state, i);
+ 			break;
+ 		}
+ 	}
+ 
+-	widget_schedule_redraw(widget);
++	widget_schedule_redraw(widget); // Redraw after click
+ }
+ 
+ static void
+@@ -724,7 +754,7 @@ touch_handler(struct input *input, uint32_t time,
+ 		col -= layout->keys[i].width;
+ 		if (col < 0) {
+ 			keyboard_handle_key(keyboard, time,
+-					    &layout->keys[i], input, state);
++					    &layout->keys[i], input, state, i);
+ 			break;
+ 		}
+ 	}
+@@ -1017,6 +1047,7 @@ keyboard_create(struct virtual_keyboard *virtual_keyboard)
+ 	keyboard->keyboard = virtual_keyboard;
+ 	keyboard->window = window_create_custom(virtual_keyboard->display);
+ 	keyboard->widget = window_add_widget(keyboard->window, keyboard);
++	keyboard->pressed_keys = xzalloc(layout->count * sizeof(bool));
+ 
+ 	virtual_keyboard->keyboard = keyboard;
+ 
+@@ -1053,6 +1084,7 @@ keyboard_destroy(struct virtual_keyboard *virtual_keyboard)
+ 
+ 	widget_destroy(virtual_keyboard->keyboard->widget);
+ 	window_destroy(virtual_keyboard->keyboard->window);
++	free(virtual_keyboard->keyboard->pressed_keys);
+ 	free(virtual_keyboard->keyboard);
+ }
+ 
