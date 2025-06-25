@@ -1,0 +1,48 @@
+From c4c780a957250163b6e4ffaeb1a3f024ad066c13 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 23 Jan 2025 10:00:46 +0800
+Subject: [PATCH 7/9] board: mt8370: fixup device-tree memory size
+
+update onboard ddr size to fix device-tree's memory size
+---
+ board/mediatek/mt8370/mt8370_evk.c        | 14 ++++++++++++++
+ configs/globalscale_mt510ss_evk_defconfig |  4 ++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/board/mediatek/mt8370/mt8370_evk.c b/board/mediatek/mt8370/mt8370_evk.c
+index a44745ef60..b3ebd48f72 100644
+--- a/board/mediatek/mt8370/mt8370_evk.c
++++ b/board/mediatek/mt8370/mt8370_evk.c
+@@ -208,3 +208,17 @@ int board_init(void)
+ 
+ 	return 0;
+ }
++
++#ifdef CONFIG_OF_BOARD_SETUP
++int ft_board_setup(void *blob, struct bd_info *bd)
++{
++	u64 base[CONFIG_NR_DRAM_BANKS];
++	u64 size[CONFIG_NR_DRAM_BANKS];
++
++	base[0] = gd->bd->bi_dram[0].start;
++	size[0] = gd->bd->bi_dram[0].size;
++
++	fdt_fixup_memory_banks(blob, base, size, 1);
++	return 0;
++}
++#endif /* CONFIG_OF_BOARD_SETUP */
+diff --git a/configs/globalscale_mt510ss_evk_defconfig b/configs/globalscale_mt510ss_evk_defconfig
+index 8697103fab..94f0072e8a 100644
+--- a/configs/globalscale_mt510ss_evk_defconfig
++++ b/configs/globalscale_mt510ss_evk_defconfig
+@@ -127,3 +127,7 @@ CONFIG_EFI_CAPSULE_AUTHENTICATE=y
+ CONFIG_LMB_MAX_REGIONS=16
+ CONFIG_SYSINFO=y
+ CONFIG_SYSINFO_SMBIOS=y
++CONFIG_OF_BOARD_SETUP=y
++CONFIG_OF_LIBFDT=y
++CONFIG_ARCH_FIXUP_FDT_MEMORY=y
++CONFIG_MTK_PLAT_GET_DRAM_SIZE=y
+-- 
+2.47.1
+
