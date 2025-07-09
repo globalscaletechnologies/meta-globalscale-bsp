@@ -1,0 +1,33 @@
+#include <dt-bindings/interrupt-controller/irq.h>
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@0 {
+		target-path = "/";
+		__overlay__ {
+			can_clk: can-clk {
+				compatible = "fixed-clock";
+				#clock-cells = <0>;
+				clock-frequency = <40000000>;
+				clock-output-names = "can-clk";
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&spi0>;
+		__overlay__ {
+			status = "okay";
+
+			can0: can0@0 {
+				compatible = "microchip,mcp2518fd";
+				reg = <0>;
+				clocks = <&can_clk>;
+				spi-max-frequency = <40000000>;
+				interrupts-extended = <&pio 75 IRQ_TYPE_LEVEL_LOW>;
+			};
+		};
+	};
+};
