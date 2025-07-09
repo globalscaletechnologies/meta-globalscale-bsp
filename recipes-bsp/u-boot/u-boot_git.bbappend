@@ -10,4 +10,5 @@ SRC_URI:append:globalscale-mt510ss-evk = " \
     file://0007-board-mt8370-fixup-device-tree-memory-size.patch \
     file://0008-cmd-axprog-Asix-USB-to-Ethernet-EEPROM-programming-u.patch \
     file://0009-configs-mt510ss-enable-asix-usb-to-ethernet-eeprom-p.patch \
+    file://0010-configs-add-missing-CONFIG_SYS_BOOTM_LEN-0x5000000.patch \
 "
