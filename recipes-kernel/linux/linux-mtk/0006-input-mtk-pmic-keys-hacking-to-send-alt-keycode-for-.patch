@@ -1,0 +1,46 @@
+From f1675a0c08d0e813c32f3a171cbe83ced319a61d Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Fri, 14 Feb 2025 11:34:50 +0800
+Subject: [PATCH 6/6] input: mtk-pmic-keys: hacking to send alt + [keycode] for
+ home assistant
+
+hacking to send alt + [keycode] for home assistant, we need to send
+alt + [keycode: ex.home] to chromium to go to home page,
+or alt + [keycode: ex.left] to chromium to go to back previous page
+---
+ drivers/input/keyboard/mtk-pmic-keys.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/input/keyboard/mtk-pmic-keys.c b/drivers/input/keyboard/mtk-pmic-keys.c
+index c978d1e57b1b..3ac69f1377dd 100644
+--- a/drivers/input/keyboard/mtk-pmic-keys.c
++++ b/drivers/input/keyboard/mtk-pmic-keys.c
+@@ -210,7 +210,14 @@ static irqreturn_t mtk_pmic_keys_irq_handler_thread(int irq, void *data)
+ 
+ 	pressed = !key_deb;
+ 
+-	input_report_key(info->keys->input_dev, info->keycode, pressed);
++	/* hacking to send alt + [keycode] for home assistant */
++	if (pressed) {
++		input_report_key(info->keys->input_dev, KEY_LEFTALT, 1);
++		input_report_key(info->keys->input_dev, info->keycode, 1);
++	} else {
++		input_report_key(info->keys->input_dev, info->keycode, 0);
++		input_report_key(info->keys->input_dev, KEY_LEFTALT, 0);
++	}
+ 	input_sync(info->keys->input_dev);
+ 
+ 	dev_dbg(info->keys->dev, "(%s) key =%d using PMIC\n",
+@@ -406,6 +413,9 @@ static int mtk_pmic_keys_probe(struct platform_device *pdev)
+ 		index++;
+ 	}
+ 
++	/* hacking to enable alt key for home assistant */
++	set_bit(KEY_LEFTALT, input_dev->keybit);
++
+ 	error = input_register_device(input_dev);
+ 	if (error) {
+ 		dev_err(&pdev->dev,
+-- 
+2.43.0
+

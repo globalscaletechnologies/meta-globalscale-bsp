@@ -1,0 +1,25 @@
+From f3f06a0c947c950874790f54ec564faccdbf0a7a Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Wed, 25 Jun 2025 15:26:23 +0800
+Subject: [PATCH 3/6] mt8188-mt6359: add speaker dapm widget
+
+add speaker dapm widget 'Speaker'
+---
+ sound/soc/mediatek/mt8188/mt8188-mt6359.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/sound/soc/mediatek/mt8188/mt8188-mt6359.c b/sound/soc/mediatek/mt8188/mt8188-mt6359.c
+index 6d2e7641e9dd..e617779e6511 100644
+--- a/sound/soc/mediatek/mt8188/mt8188-mt6359.c
++++ b/sound/soc/mediatek/mt8188/mt8188-mt6359.c
+@@ -313,6 +313,7 @@ static const struct snd_soc_dapm_widget mt8188_rear_spk_widgets[] = {
+ 
+ static const struct snd_soc_dapm_widget mt8188_mt6359_widgets[] = {
+ 	SND_SOC_DAPM_HP("Headphone", NULL),
++	SND_SOC_DAPM_SPK("Speaker", NULL),
+ 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+ 	SND_SOC_DAPM_MIC("AP DMIC", NULL),
+ 	SND_SOC_DAPM_SINK("HDMI"),
+-- 
+2.43.0
+

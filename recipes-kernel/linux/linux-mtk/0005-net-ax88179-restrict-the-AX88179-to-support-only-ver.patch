@@ -1,0 +1,28 @@
+From cb3127fddd13b67e737846f7d16ff0e7b331299b Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Wed, 25 Jun 2025 15:47:44 +0800
+Subject: [PATCH 5/6] net: ax88179: restrict the AX88179 to support only
+ version 0-3.0
+
+restrict the AX88179 to support only version 0 to 3.0 to prevent
+ax88279 chip (ver 4.0) loading this driver.
+---
+ drivers/net/usb/ax88179_178a.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/usb/ax88179_178a.c b/drivers/net/usb/ax88179_178a.c
+index 73de34179f35..13d95f13c340 100644
+--- a/drivers/net/usb/ax88179_178a.c
++++ b/drivers/net/usb/ax88179_178a.c
+@@ -1883,7 +1883,7 @@ static const struct driver_info at_umc2000sp_info = {
+ static const struct usb_device_id products[] = {
+ {
+ 	/* ASIX AX88179 10/100/1000 */
+-	USB_DEVICE_AND_INTERFACE_INFO(0x0b95, 0x1790, 0xff, 0xff, 0),
++	USB_DEVICE_VER(0x0b95, 0x1790, 0, 0x0300),
+ 	.driver_info = (unsigned long)&ax88179_info,
+ }, {
+ 	/* ASIX AX88178A 10/100/1000 */
+-- 
+2.43.0
+
