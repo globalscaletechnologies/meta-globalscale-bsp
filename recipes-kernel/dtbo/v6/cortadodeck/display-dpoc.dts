@@ -1,0 +1,139 @@
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/pinctrl/mt8189-pinfunc.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/phy/phy.h>
+
+/ {
+	fragment@0 {
+		target = <&dp_tx>;
+		__overlay__ {
+			status = "okay";
+			pinctrl-names = "default";
+			pinctrl-0 = <&dp_gpio_def_cfg>;
+			orientation-switch;
+			dpoc;
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				port@0 {
+					reg = <0>;
+					dptx_in0: endpoint {
+						remote-endpoint = <&disp_dvo1_out>;
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+					dptx_usb_sbu: endpoint {
+						remote-endpoint = <&usb_dptx_sbu>;
+					};
+				};
+
+				port@2 {
+					reg = <2>;
+					dp_in: endpoint {
+						data-lanes = <0 1 2 3>;
+					};
+				};
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&disp_dvo1>;
+		__overlay__ {
+			status = "okay";
+			ports {
+				port {
+					disp_dvo1_out: endpoint {
+						remote-endpoint = <&dp_in>;
+					};
+				};
+			};
+		};
+	};
+
+	fragment@2 {
+		target = <&pio>;
+		__overlay__ {
+			dp_gpio_def_cfg: dp-default {
+				pins-hpd {
+					pinmux = <PINMUX_GPIO27__FUNC_DP_TX_HPD>;
+					input-enable;
+					bias-disable;
+				};
+			};
+		};
+	};
+
+	fragment@3 {
+		target = <&sound>;
+		__overlay__ {
+			dai-link-2 {
+				status = "okay";
+			};
+		};
+	};
+
+	fragment@4 {
+		target-path = "/";
+		__overlay__ {
+			ts3_3v3: ts3-3v3 {
+				compatible = "regulator-fixed";
+				regulator-name = "ts3-3v3";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+				enable-active-high;
+			};
+		};
+	};
+
+	fragment@5 {
+		target = <&usb_con_p0>;
+		__overlay__ {
+			displayport = <&dp_tx>;
+			altmodes {
+				dp {
+					svid = <0x0ff01>;
+					vdo = <0x1c47>;
+				};
+			};
+
+			ports {
+				port@2 {
+					reg = <2>;
+					tcpc_typec_dp_sbu: endpoint {
+						remote-endpoint = <&typec_dp_sbu_mux>;
+					};
+				};
+
+				port@3 {
+					reg = <3>;
+					usb_dptx_sbu: endpoint {
+						remote-endpoint = <&dptx_usb_sbu>;
+					};
+				};
+			};
+		};
+	};
+
+	fragment@6 {
+		target = <&i2c6>;
+		__overlay__ {
+			ts3usbca4@5c {
+				compatible = "it,ts3usbca4";
+				reg = <0x5c>;
+				mux3v3-supply = <&ts3_3v3>;
+				orientation-switch;
+
+				port {
+					typec_dp_sbu_mux: endpoint {
+						remote-endpoint = <&tcpc_typec_dp_sbu>;
+					};
+				};
+			};
+		};
+	};
+};
