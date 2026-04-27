@@ -1,0 +1,59 @@
+From 97de5bf74bf1161878f4f7137c1b78c0c96bd2db Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 27 Apr 2026 11:13:47 +0800
+Subject: [PATCH] drm/panel: panel-edp: Add support for Microtech MTF070FD96A
+ panel
+
+Add support for the Microtech MTF070FD96A 7-inch eDP panel(1920x1080).
+---
+ drivers/gpu/drm/panel/panel-edp.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/drivers/gpu/drm/panel/panel-edp.c b/drivers/gpu/drm/panel/panel-edp.c
+index b34313006c81..9d595d4db6b3 100644
+--- a/drivers/gpu/drm/panel/panel-edp.c
++++ b/drivers/gpu/drm/panel/panel-edp.c
+@@ -1780,6 +1780,33 @@ static const struct panel_desc starry_kr122ea0sra = {
+ 	},
+ };
+ 
++static const struct drm_display_mode microtech_mtf070fd96a_mode = {
++	.clock = 105000,
++	.hdisplay = 1920,
++	.hsync_start = 1920 + 20,
++	.hsync_end = 1920 + 20 + 10,
++	.htotal = 1920 + 20 + 20 + 10,
++	.vdisplay = 1080,
++	.vsync_start = 1080 + 4,
++	.vsync_end = 1080 + 4 + 2,
++	.vtotal = 1080 + 4 + 2 + 4,
++};
++
++static const struct panel_desc microtech_mtf070fd96a = {
++	.modes = &microtech_mtf070fd96a_mode,
++	.num_modes = 1,
++	.bpc = 8,
++	.size = {
++		.width = 165,
++		.height = 106,
++	},
++	.delay = {
++		.hpd_absent = 200,
++		.enable = 50,
++		.unprepare = 500,
++	},
++};
++
+ static const struct of_device_id platform_of_match[] = {
+ 	{
+ 		/* Must be first */
+@@ -1874,6 +1901,9 @@ static const struct of_device_id platform_of_match[] = {
+ 	}, {
+ 		.compatible = "starry,kr122ea0sra",
+ 		.data = &starry_kr122ea0sra,
++	}, {
++		.compatible = "microtech,mtf070fd96a",
++		.data = &microtech_mtf070fd96a,
+ 	}, {
+ 		/* sentinel */
+ 	}

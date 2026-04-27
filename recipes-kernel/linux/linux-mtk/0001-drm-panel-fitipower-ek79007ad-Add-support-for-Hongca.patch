@@ -1,0 +1,495 @@
+From c4fc1ee2b7f13309c538124460ce974ca0120f1d Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Wed, 15 Apr 2026 09:58:07 +0800
+Subject: [PATCH] drm/panel: fitipower-ek79007ad: Add support for Hongcai
+ HC-700BE4007D panel
+
+Add support for the Hongcai HC-700BE4007D 7-inch 1024x600 MIPI-DSI
+LCD panel using the Fitipower EK79007AD controller.
+---
+ drivers/gpu/drm/panel/Kconfig                 |   9 +
+ drivers/gpu/drm/panel/Makefile                |   1 +
+ .../gpu/drm/panel/panel-fitipower-ek79007ad.c | 447 ++++++++++++++++++
+ 3 files changed, 457 insertions(+)
+ create mode 100644 drivers/gpu/drm/panel/panel-fitipower-ek79007ad.c
+
+diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+index ec7df2ca8f07..e5eba4b05a99 100644
+--- a/drivers/gpu/drm/panel/Kconfig
++++ b/drivers/gpu/drm/panel/Kconfig
+@@ -865,4 +865,13 @@ config DRM_PANEL_AUO_G156XTN010_LVDS
+ 	select VIDEOMODE_HELPERS
+ 	help
+ 	  Say Y here if you want to enable AUO G156XTN010 1366*768 LVDS panel
++
++config DRM_PANEL_FITIPOWER_EK79007AD
++	tristate "Fitipower EK79007AD-based panels"
++	depends on OF
++	depends on DRM_MIPI_DSI
++	depends on BACKLIGHT_CLASS_DEVICE
++	help
++	  Say Y if you want to enable support for panels based on the
++	  Fitipower EK79007AD controller.
+ endmenu
+diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
+index 3e53b34c31c4..2aa36b8cb3de 100644
+--- a/drivers/gpu/drm/panel/Makefile
++++ b/drivers/gpu/drm/panel/Makefile
+@@ -88,3 +88,4 @@ obj-$(CONFIG_DRM_PANEL_VISIONOX_R66451) += panel-visionox-r66451.o
+ obj-$(CONFIG_DRM_PANEL_WIDECHIPS_WS2401) += panel-widechips-ws2401.o
+ obj-$(CONFIG_DRM_PANEL_XINPENG_XPP055C272) += panel-xinpeng-xpp055c272.o
+ obj-$(CONFIG_DRM_PANEL_AUO_G156XTN010_LVDS) += panel-auo-g156xtn010.o
++obj-$(CONFIG_DRM_PANEL_FITIPOWER_EK79007AD) += panel-fitipower-ek79007ad.o
+diff --git a/drivers/gpu/drm/panel/panel-fitipower-ek79007ad.c b/drivers/gpu/drm/panel/panel-fitipower-ek79007ad.c
+new file mode 100644
+index 000000000000..9045b959a1ec
+--- /dev/null
++++ b/drivers/gpu/drm/panel/panel-fitipower-ek79007ad.c
+@@ -0,0 +1,447 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2018 MediaTek Inc.
++ * Author: Jitao Shi <jitao.shi@mediatek.com>
++ */
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/regulator/consumer.h>
++
++#include <drm/drm_connector.h>
++#include <drm/drm_crtc.h>
++#include <drm/drm_mipi_dsi.h>
++#include <drm/drm_panel.h>
++
++#include <video/mipi_display.h>
++
++struct ek79007ad_panel_desc {
++	const struct drm_display_mode *modes;
++	unsigned int num_modes;
++	unsigned int bpc;
++
++	/**
++	 * @width_mm: width of the panel's active display area
++	 * @height_mm: height of the panel's active display area
++	 */
++	struct {
++		unsigned int width_mm;
++		unsigned int height_mm;
++	} size;
++
++	unsigned long mode_flags;
++	enum mipi_dsi_pixel_format format;
++	const struct panel_init_cmd *init_cmds;
++	unsigned int lanes;
++};
++
++struct ek79007ad {
++	struct drm_panel panel;
++	struct mipi_dsi_device *dsi;
++	struct device *dev;
++	const struct ek79007ad_panel_desc *desc;
++
++	struct gpio_desc *reset_gpio;
++	struct gpio_desc *lcmen_gpio;
++	struct gpio_desc *leden_gpio;
++
++	bool prepared_power;
++	bool prepared;
++};
++
++enum dsi_cmd_type {
++	INIT_DCS_CMD,
++	INIT_GEN_CMD,
++	DELAY_CMD,
++};
++
++struct panel_init_cmd {
++	enum dsi_cmd_type type;
++	size_t len;
++	const char *data;
++};
++
++#define _INIT_GEN_CMD(...) { \
++	.type = INIT_GEN_CMD, \
++	.len = sizeof((char[]){__VA_ARGS__}), \
++	.data = (char[]){__VA_ARGS__} }
++
++#define _INIT_DCS_CMD(...) { \
++	.type = INIT_DCS_CMD, \
++	.len = sizeof((char[]){__VA_ARGS__}), \
++	.data = (char[]){__VA_ARGS__} }
++
++#define _INIT_DELAY_CMD(...) { \
++	.type = DELAY_CMD,\
++	.len = sizeof((char[]){__VA_ARGS__}), \
++	.data = (char[]){__VA_ARGS__} }
++
++static const struct panel_init_cmd ek79007ad_init_cmd[] = {
++	_INIT_DCS_CMD(0xB2, 0x10),
++	_INIT_DCS_CMD(0x80, 0xAB),
++	_INIT_DCS_CMD(0x81, 0x4B),
++	_INIT_DCS_CMD(0x82, 0x84),
++	_INIT_DCS_CMD(0x83, 0x88),
++	_INIT_DCS_CMD(0x84, 0xA8),
++	_INIT_DCS_CMD(0x85, 0xE3),
++	_INIT_DCS_CMD(0x86, 0xB8),
++
++	_INIT_DCS_CMD(0x11),
++	_INIT_DELAY_CMD(120),
++	_INIT_DCS_CMD(0x29),
++	_INIT_DELAY_CMD(20),
++	{},
++};
++
++static inline struct ek79007ad *to_ek79007ad(struct drm_panel *panel)
++{
++	return container_of(panel, struct ek79007ad, panel);
++}
++
++static int ek79007ad_panel_init_dcs_cmd(struct ek79007ad *ek79007ad)
++{
++	struct mipi_dsi_device *dsi = ek79007ad->dsi;
++	struct drm_panel *panel = &ek79007ad->panel;
++	int i, err = 0;
++
++	if (ek79007ad->desc->init_cmds) {
++		const struct panel_init_cmd *init_cmds = ek79007ad->desc->init_cmds;
++
++		for (i = 0; init_cmds[i].len != 0; i++) {
++			const struct panel_init_cmd *cmd = &init_cmds[i];
++
++			switch (cmd->type) {
++			case DELAY_CMD:
++				msleep(cmd->data[0]);
++				err = 0;
++				break;
++
++			case INIT_DCS_CMD:
++				err = mipi_dsi_dcs_write(dsi, cmd->data[0],
++							 cmd->len <= 1 ? NULL :
++							 &cmd->data[1],
++							 cmd->len - 1);
++				break;
++
++			case INIT_GEN_CMD:
++				err = mipi_dsi_generic_write(dsi,
++							 cmd->len <= 1 ? NULL :
++							 &cmd->data[0],
++							 cmd->len);
++				break;
++
++			default:
++				err = -EINVAL;
++			}
++
++			if (err < 0) {
++				dev_err(panel->dev,
++					"failed to write command %u\n", i);
++				return err;
++			}
++		}
++	}
++	return 0;
++}
++
++static int ek79007ad_panel_enter_sleep_mode(struct ek79007ad *ek79007ad)
++{
++	struct mipi_dsi_device *dsi = ek79007ad->dsi;
++	int ret;
++
++	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
++
++	ret = mipi_dsi_dcs_set_display_off(dsi);
++	if (ret < 0) {
++		return ret;
++	}
++
++	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
++	if (ret < 0) {
++		return ret;
++	}
++
++	return 0;
++}
++
++static int ek79007ad_panel_unprepare_power(struct drm_panel *panel)
++{
++	struct ek79007ad *ek79007ad = to_ek79007ad(panel);
++
++	if (!ek79007ad->prepared_power) {
++		return 0;
++	}
++
++	msleep(150);
++
++	gpiod_set_value_cansleep(ek79007ad->reset_gpio, 0);
++	msleep(15);
++	gpiod_set_value_cansleep(ek79007ad->leden_gpio, 0);
++	msleep(15);
++	gpiod_set_value_cansleep(ek79007ad->lcmen_gpio, 0);
++
++	ek79007ad->prepared_power = false;
++
++	return 0;
++}
++
++static int ek79007ad_panel_unprepare(struct drm_panel *panel)
++{
++	struct ek79007ad *ek79007ad = to_ek79007ad(panel);
++	int ret;
++
++	if (!ek79007ad->prepared) {
++		return 0;
++	}
++
++	ret = ek79007ad_panel_enter_sleep_mode(ek79007ad);
++	if (ret < 0) {
++		dev_err(panel->dev, "failed to set panel off: %d\n",
++			ret);
++		return ret;
++	}
++
++	ek79007ad_panel_unprepare_power(panel);
++
++	ek79007ad->prepared = false;
++
++	return 0;
++}
++
++static int ek79007ad_panel_prepare_power(struct drm_panel *panel)
++{
++	struct ek79007ad *ek79007ad = to_ek79007ad(panel);
++
++	if (ek79007ad->prepared_power) {
++		return 0;
++	}
++
++	gpiod_set_value_cansleep(ek79007ad->reset_gpio, 0);
++	gpiod_set_value_cansleep(ek79007ad->lcmen_gpio, 0);
++	gpiod_set_value_cansleep(ek79007ad->leden_gpio, 0);
++
++	usleep_range(10000,12000);
++	gpiod_set_value_cansleep(ek79007ad->lcmen_gpio, 1);
++	msleep(15);
++	gpiod_set_value_cansleep(ek79007ad->leden_gpio, 1);
++	usleep_range(10000,12000);
++	gpiod_set_value_cansleep(ek79007ad->reset_gpio, 1);
++	msleep(100);
++
++	ek79007ad->prepared_power = true;
++
++	return 0;
++}
++
++static int ek79007ad_panel_prepare(struct drm_panel *panel)
++{
++	struct ek79007ad *ek79007ad = to_ek79007ad(panel);
++	int ret;
++
++	if (ek79007ad->prepared) {
++		return 0;
++	}
++
++	ek79007ad_panel_prepare_power(panel);
++
++	ret = ek79007ad_panel_init_dcs_cmd(ek79007ad);
++	if (ret < 0) {
++		dev_err(panel->dev, "failed to init panel: %d\n", ret);
++		return ret;
++	}
++
++	ek79007ad->prepared = true;
++
++	return 0;
++}
++
++static const struct drm_display_mode hc700be4007d_modes[] = {
++	{
++		.clock = 51200,
++		.hdisplay = 1024,
++		.hsync_start = 1024 + 160,
++		.hsync_end = 1024 + 160 + 70,
++		.htotal = 1024 + 160 + 70 + 90,
++		.vdisplay = 600,
++		.vsync_start = 600 + 12,
++		.vsync_end = 600 + 12 + 10,
++		.vtotal = 600 + 12 + 10 + 13,
++	},
++};
++
++static const struct ek79007ad_panel_desc hc700be4007d_desc = {
++	.modes = hc700be4007d_modes,
++	.num_modes = ARRAY_SIZE(hc700be4007d_modes),
++	.bpc = 8,
++	.size = {
++		.width_mm = 154,
++		.height_mm = 86,
++	},
++	.lanes = 2,
++	.format = MIPI_DSI_FMT_RGB888,
++	.mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE |
++		      MIPI_DSI_MODE_LPM,
++	.init_cmds = ek79007ad_init_cmd,
++};
++
++static int ek79007ad_panel_get_modes(struct drm_panel *panel,
++				     struct drm_connector *connector)
++{
++	struct ek79007ad *ek79007ad = to_ek79007ad(panel);
++	const struct ek79007ad_panel_desc *desc = ek79007ad->desc;
++	struct drm_display_mode *mode;
++	unsigned int i;
++
++	for (i = 0; i < desc->num_modes; i++) {
++		const struct drm_display_mode *m = &desc->modes[i];
++
++		mode = drm_mode_duplicate(connector->dev, m);
++		if (!mode) {
++			dev_err(panel->dev, "failed to add mode %ux%u@%u\n",
++				m->hdisplay, m->vdisplay, drm_mode_vrefresh(m));
++			return -ENOMEM;
++		}
++
++		mode->type = DRM_MODE_TYPE_DRIVER;
++
++		if (i == 0)
++			mode->type |= DRM_MODE_TYPE_PREFERRED;
++
++		drm_mode_set_name(mode);
++		drm_mode_probed_add(connector, mode);
++	}
++
++	connector->display_info.width_mm = desc->size.width_mm;
++	connector->display_info.height_mm = desc->size.height_mm;
++	connector->display_info.bpc = desc->bpc;
++
++	return desc->num_modes;
++}
++
++static const struct drm_panel_funcs ek79007ad_panel_funcs = {
++	.unprepare = ek79007ad_panel_unprepare,
++	.prepare = ek79007ad_panel_prepare,
++	.get_modes = ek79007ad_panel_get_modes,
++};
++
++static int ek79007ad_panel_add(struct ek79007ad *ek79007ad)
++{
++	struct device *dev = &ek79007ad->dsi->dev;
++	int ret;
++
++	ek79007ad->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
++	if (IS_ERR(ek79007ad->reset_gpio)) {
++		ret = PTR_ERR(ek79007ad->reset_gpio);
++		dev_err(dev, "cannot get reset-gpios %d\n", ret);
++		return ret;
++	}
++
++	ek79007ad->leden_gpio = devm_gpiod_get(dev, "leden", GPIOD_OUT_HIGH);
++	if (IS_ERR(ek79007ad->leden_gpio)) {
++		ret = PTR_ERR(ek79007ad->leden_gpio);
++		dev_err(dev, "cannot get led-en-gpio %d\n", ret);
++		return ret;
++	}
++
++	ek79007ad->lcmen_gpio = devm_gpiod_get_optional(dev, "lcmen", GPIOD_OUT_HIGH);
++	if (IS_ERR(ek79007ad->lcmen_gpio)) {
++		ret = PTR_ERR(ek79007ad->lcmen_gpio);
++		dev_err(dev, "cannot get lcmen-gpio %d\n", ret);
++		return ret;
++	}
++
++	drm_panel_init(&ek79007ad->panel, dev, &ek79007ad_panel_funcs,
++			DRM_MODE_CONNECTOR_DSI);
++
++	ret = drm_panel_of_backlight(&ek79007ad->panel);
++	if (ret)
++		return ret;
++
++	drm_panel_add(&ek79007ad->panel);
++
++	return 0;
++}
++
++static int ek79007ad_panel_probe(struct mipi_dsi_device *dsi)
++{
++	struct ek79007ad *ek79007ad;
++	struct device *dev = &dsi->dev;
++	int ret;
++	const struct ek79007ad_panel_desc *desc;
++
++	ek79007ad = devm_kzalloc(&dsi->dev, sizeof(*ek79007ad), GFP_KERNEL);
++	if (!ek79007ad) {
++		return -ENOMEM;
++	}
++
++	ek79007ad->dev = dev;
++	desc = of_device_get_match_data(&dsi->dev);
++	dsi->lanes = desc->lanes;
++	dsi->format = desc->format;
++	dsi->mode_flags = desc->mode_flags;
++	ek79007ad->desc = desc;
++	ek79007ad->dsi = dsi;
++	ret = ek79007ad_panel_add(ek79007ad);
++	if (ret < 0) {
++		return ret;
++	}
++
++	mipi_dsi_set_drvdata(dsi, ek79007ad);
++
++	ret = mipi_dsi_attach(dsi);
++	if (ret) {
++		drm_panel_remove(&ek79007ad->panel);
++	}
++
++	return ret;
++}
++
++static void ek79007ad_panel_shutdown(struct mipi_dsi_device *dsi)
++{
++	struct ek79007ad *ek79007ad = mipi_dsi_get_drvdata(dsi);
++
++	drm_panel_disable(&ek79007ad->panel);
++	drm_panel_unprepare(&ek79007ad->panel);
++}
++
++static void ek79007ad_panel_remove(struct mipi_dsi_device *dsi)
++{
++	struct ek79007ad *ek79007ad = mipi_dsi_get_drvdata(dsi);
++	int ret;
++
++	ek79007ad_panel_shutdown(dsi);
++
++	ret = mipi_dsi_detach(dsi);
++	if (ret < 0) {
++		dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", ret);
++	}
++
++	if (ek79007ad->panel.dev) {
++		drm_panel_remove(&ek79007ad->panel);
++	}
++}
++
++static const struct of_device_id ek79007ad_of_match[] = {
++	{ .compatible = "hongcai,hc700be4007d",
++	  .data = &hc700be4007d_desc
++	},
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, ek79007ad_of_match);
++
++static struct mipi_dsi_driver ek79007ad_panel_driver = {
++	.driver = {
++		.name = "panel-ek79007ad-700be4007d",
++		.of_match_table = ek79007ad_of_match,
++	},
++	.probe = ek79007ad_panel_probe,
++	.remove = ek79007ad_panel_remove,
++	.shutdown = ek79007ad_panel_shutdown,
++};
++module_mipi_dsi_driver(ek79007ad_panel_driver);
++
++MODULE_AUTHOR("Jason Hung <jhung@globalscaletechnologies.com>");
++MODULE_DESCRIPTION("HONGCAI HC-700BE4007D 1024x600 video mode panel driver");
++MODULE_LICENSE("GPL");

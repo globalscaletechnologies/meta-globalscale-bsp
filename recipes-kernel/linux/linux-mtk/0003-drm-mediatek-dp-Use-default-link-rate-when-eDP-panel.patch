@@ -1,0 +1,37 @@
+From da8be886a2b9717c1e40e11bf34d8f90f9bb4872 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 27 Apr 2026 11:15:40 +0800
+Subject: [PATCH] drm/mediatek: dp: Use default link rate when eDP panel
+ reports zero max rate
+
+Some eDP panels report an invalid value of 0x00 for the
+DP_MAX_LINK_RATE DPCD register during capability parsing.
+
+A zero max link rate prevents the driver from selecting any valid
+link configuration, which can cause link training failure and no
+display output.
+
+Use HBR3 as the default maximum link rate when the reported value
+is zero. This allows the normal link training process to negotiate
+the highest rate supported by the sink and fall back as needed.
+---
+ drivers/gpu/drm/mediatek/mtk_dp.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_dp.c b/drivers/gpu/drm/mediatek/mtk_dp.c
+index 52284330997c..6bd419996a0d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dp.c
++++ b/drivers/gpu/drm/mediatek/mtk_dp.c
+@@ -1977,6 +1977,12 @@ static int mtk_dp_parse_capabilities(struct mtk_dp *mtk_dp)
+ 	if (ret < 0)
+ 		return ret;
+ 
++	/* Some eDP panels report zero max link rate,
++	 * use HBR3 for training fallback */
++	if (mtk_dp->rx_cap[DP_MAX_LINK_RATE] == 0) {
++		mtk_dp->rx_cap[DP_MAX_LINK_RATE] = DP_LINK_BW_8_1;
++	}
++
+ 	if (drm_dp_tps4_supported(mtk_dp->rx_cap))
+ 		mtk_dp->train_info.channel_eq_pattern = DP_TRAINING_PATTERN_4;
+ 	else if (drm_dp_tps3_supported(mtk_dp->rx_cap))

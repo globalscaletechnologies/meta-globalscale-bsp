@@ -1,0 +1,210 @@
+From 8aa8973533eadce63da3216705cb80809fe7c557 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 27 Apr 2026 11:23:07 +0800
+Subject: [PATCH] ASoC: mediatek: mt8189: add board GPIO controls for speaker
+ amp and mic source
+
+Add board-specific private data to manage optional GPIO controls for
+external speaker amplifier enable and headset/onboard microphone source
+selection.
+---
+ sound/soc/mediatek/mt8189/mt8189-mt6359p.c | 142 +++++++++++++++++++++
+ 1 file changed, 142 insertions(+)
+
+diff --git a/sound/soc/mediatek/mt8189/mt8189-mt6359p.c b/sound/soc/mediatek/mt8189/mt8189-mt6359p.c
+index 2a6e15b68c5a..c04cbc16f660 100644
+--- a/sound/soc/mediatek/mt8189/mt8189-mt6359p.c
++++ b/sound/soc/mediatek/mt8189/mt8189-mt6359p.c
+@@ -12,6 +12,7 @@
+ #include <sound/soc.h>
+ #include <sound/jack.h>
+ #include <linux/input.h>
++#include <linux/gpio/consumer.h>
+ 
+ #include "mtk-afe-platform-driver.h"
+ #include "mtk-soundcard-driver.h"
+@@ -50,6 +51,16 @@
+  */
+ #define RT5682I_CODEC_DAI     "rt5682-aif1"
+ 
++struct mt8189_board_priv {
++	struct gpio_desc *spk_amp_gpio;
++	struct gpio_desc *mic_sel_gpio;
++	unsigned int spk_enable;
++	unsigned int mic_source;
++};
++
++#define MT8189_PRIV(_soc) \
++	((struct mt8189_board_priv *)(_soc)->mach_priv)
++
+ enum mt8189_jacks {
+ 	MT8189_JACK_HEADSET,
+ 	MT8189_JACK_DP,
+@@ -124,6 +135,101 @@ static const struct snd_kcontrol_new mt8189_nau8825_controls[] = {
+  */
+ #define EXT_SPK_AMP_W_NAME "Ext_Speaker_Amp"
+ 
++static void mt8189_aud_ext_spk_amp(
++	struct mt8189_board_priv *priv,
++	bool on)
++{
++	if (!priv || !priv->spk_amp_gpio)
++		return;
++
++	gpiod_set_value_cansleep(priv->spk_amp_gpio, on);
++}
++
++static int mt8189_mt6359p_spk_amp_event(
++	struct snd_soc_dapm_widget *w,
++	struct snd_kcontrol *kcontrol,
++	int event)
++{
++	struct snd_soc_card *card = w->dapm->card;
++	struct mtk_soc_card_data *soc_card_data;
++	struct mt8189_board_priv *priv;
++
++	soc_card_data = snd_soc_card_get_drvdata(card);
++	if (!soc_card_data)
++		return 0;
++
++	priv = soc_card_data->mach_priv;
++	if (!priv || !priv->spk_amp_gpio)
++		return 0;
++
++	dev_info(card->dev, "%s(), event=%d\n", __func__, event);
++
++	switch (event) {
++	case SND_SOC_DAPM_POST_PMU:
++		mt8189_aud_ext_spk_amp(priv, true);
++		break;
++
++	case SND_SOC_DAPM_PRE_PMD:
++		mt8189_aud_ext_spk_amp(priv, false);
++		break;
++	}
++
++	return 0;
++}
++
++static const char * const mt8189_hs_mic_switch_text[] = {
++	"Onboard Mic",
++	"Headset Mic",
++};
++
++static SOC_ENUM_SINGLE_EXT_DECL(mt8189_hs_mic_switch_enum,
++	mt8189_hs_mic_switch_text);
++
++static void mt8189_aud_hs_mic_select(struct mt8189_board_priv *priv)
++{
++	if (!priv || !priv->mic_sel_gpio)
++		return;
++
++	/* 0=onboard mic, 1=headset mic */
++	gpiod_set_value_cansleep(priv->mic_sel_gpio, priv->mic_source ? 1 : 0);
++}
++
++static int mt8189_hs_mic_switch_get(struct snd_kcontrol *kcontrol,
++			  struct snd_ctl_elem_value *ucontrol)
++{
++	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
++	struct mtk_soc_card_data *soc = snd_soc_card_get_drvdata(card);
++	struct mt8189_board_priv *priv = MT8189_PRIV(soc);
++
++	ucontrol->value.enumerated.item[0] = priv ? priv->mic_source : 0;
++
++	return 0;
++}
++
++static int mt8189_hs_mic_switch_put(struct snd_kcontrol *kcontrol,
++			  struct snd_ctl_elem_value *ucontrol)
++{
++	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
++	struct mtk_soc_card_data *soc = snd_soc_card_get_drvdata(card);
++	struct mt8189_board_priv *priv = MT8189_PRIV(soc);
++	unsigned int val;
++
++	if (!priv)
++		return 0;
++
++	val = ucontrol->value.enumerated.item[0];
++	if (val > 1)
++		val = 1;
++
++	if (priv->mic_source == val)
++		return 0;
++
++	priv->mic_source = val;
++	mt8189_aud_hs_mic_select(priv);
++
++	return 1;
++}
++
+ static const struct snd_soc_dapm_widget mt8189_mt6359p_widgets[] = {
+ 	SND_SOC_DAPM_PINCTRL("ETDMIN_SPK_PIN", "aud-gpio-i2sin1-on", "aud-gpio-i2sin1-off"),
+ 	SND_SOC_DAPM_PINCTRL("ETDMOUT_SPK_PIN", "aud-gpio-i2sout1-on", "aud-gpio-i2sout1-off"),
+@@ -133,13 +239,20 @@ static const struct snd_soc_dapm_widget mt8189_mt6359p_widgets[] = {
+ 	SND_SOC_DAPM_PINCTRL("AP_DMIC0_PIN", "aud-gpio-ap-dmic-on", "aud-gpio-ap-dmic-off"),
+ 	SND_SOC_DAPM_PINCTRL("AP_DMIC1_PIN", "aud-gpio-ap-dmic1-on", "aud-gpio-ap-dmic1-off"),
+ 	SND_SOC_DAPM_PINCTRL("PMIC_CODEC_PIN", "aud-gpio-pmic-on", "aud-gpio-pmic-off"),
++	SND_SOC_DAPM_SPK(EXT_SPK_AMP_W_NAME, mt8189_mt6359p_spk_amp_event),
+ };
+ 
+ static const struct snd_soc_dapm_route mt8189_mt6359p_routes[] = {
++	{EXT_SPK_AMP_W_NAME, NULL, "Headphone L Ext Spk Amp"},
++	{EXT_SPK_AMP_W_NAME, NULL, "Headphone R Ext Spk Amp"},
+ };
+ 
+ static const struct snd_kcontrol_new mt8189_mt6359p_controls[] = {
+ 	SOC_DAPM_PIN_SWITCH(EXT_SPK_AMP_W_NAME),
++	SOC_ENUM_EXT("Headset_Mic_Switch",
++				 mt8189_hs_mic_switch_enum,
++				 mt8189_hs_mic_switch_get,
++				 mt8189_hs_mic_switch_put),
+ };
+ 
+ /*
+@@ -1165,15 +1278,44 @@ static int mt8189_mt6359p_soc_card_probe(struct mtk_soc_card_data *soc_card_data
+ {
+ 	struct snd_soc_card *card = soc_card_data->card_data->card;
+ 	struct snd_soc_dai_link *dai_link;
++	struct mt8189_board_priv *priv;
+ 	bool init_nau8825 = false;
+ 	bool init_rt5682s = false;
+ 	bool init_rt5650 = false;
+ 	bool init_rt5682i = false;
+ 	bool init_dumb = false;
+ 	int i;
++	int ret;
+ 
+ 	dev_dbg(card->dev, "%s(), legacy: %d\n", __func__, legacy);
+ 
++	priv = devm_kzalloc(card->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	soc_card_data->mach_priv = priv;
++
++	priv->spk_amp_gpio =
++		devm_gpiod_get_optional(card->dev, "speaker-amp", GPIOD_OUT_LOW);
++	if (IS_ERR(priv->spk_amp_gpio)) {
++		ret = PTR_ERR(priv->spk_amp_gpio);
++		dev_err(card->dev,
++			"failed to get speaker-amp-gpios: %d\n", ret);
++		return ret;
++	}
++
++	priv->mic_sel_gpio =
++		devm_gpiod_get_optional(card->dev, "mic-sel", GPIOD_OUT_LOW);
++	if (IS_ERR(priv->mic_sel_gpio)) {
++		ret = PTR_ERR(priv->mic_sel_gpio);
++		dev_err(card->dev,
++			"failed to get mic-sel-gpios: %d\n", ret);
++		return ret;
++	}
++
++	priv->spk_enable = 0;
++	priv->mic_source = 1;
++
+ 	for_each_card_prelinks(card, i, dai_link) {
+ 		if (strcmp(dai_link->name, "TDM_DPTX_BE") == 0) {
+ 			if (dai_link->num_codecs &&

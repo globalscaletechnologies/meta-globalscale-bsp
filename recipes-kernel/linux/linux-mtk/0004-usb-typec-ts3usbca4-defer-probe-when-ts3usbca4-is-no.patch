@@ -1,0 +1,23 @@
+From 81d6e42181284246a88440a1b7ca4cf5e388f79a Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 27 Apr 2026 11:20:07 +0800
+Subject: [PATCH] usb: typec: ts3usbca4: defer probe when ts3usbca4 is not
+ ready
+
+---
+ drivers/usb/typec/mux/ts3usbca4.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/typec/mux/ts3usbca4.c b/drivers/usb/typec/mux/ts3usbca4.c
+index aa9b0208f0cc..906f5e3f56ef 100644
+--- a/drivers/usb/typec/mux/ts3usbca4.c
++++ b/drivers/usb/typec/mux/ts3usbca4.c
+@@ -120,7 +120,7 @@ static int ts3usbca4_probe(struct i2c_client *client)
+ 	ts3usbca4->mux3v3_enabled = false;
+ 	if (ret < 0) {
+ 		dev_info(dev, "Probe failed!\n");
+-		return ret;
++		return -EPROBE_DEFER;
+ 	}
+ 
+ 	mutex_init(&ts3usbca4->lock);
