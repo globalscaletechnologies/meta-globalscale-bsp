@@ -1,0 +1,83 @@
+From b4128ebb2e0bfa9e41764d9e4d8a86d531b19e21 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 27 Apr 2026 14:10:51 +0800
+Subject: [PATCH] board: mediatek: genio-720-evk: reset WWAN module for
+ Cortadodeck
+
+Add WWAN initialization support for the CortadoDeck board during
+board_late_init().
+---
+ board/mediatek/genio-720-evk/mt8391_evk.c | 39 +++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/board/mediatek/genio-720-evk/mt8391_evk.c b/board/mediatek/genio-720-evk/mt8391_evk.c
+index 3dc2a7bcc7..c04e8a87fd 100644
+--- a/board/mediatek/genio-720-evk/mt8391_evk.c
++++ b/board/mediatek/genio-720-evk/mt8391_evk.c
+@@ -6,6 +6,8 @@
+ 
+ #include <common.h>
+ #include <dm.h>
++#include <dm/ofnode.h>
++#include <asm/gpio.h>
+ #include <efi_loader.h>
+ #include <env.h>
+ #include <env_internal.h>
+@@ -18,6 +20,8 @@
+ #include <linux/kernel.h>
+ #include <linux/sizes.h>
+ #include <linux/arm-smccc.h>
++#include <linux/delay.h>
++#include <power/regulator.h>
+ 
+ #define MT8391_UPDATABLE_IMAGES	5
+ 
+@@ -197,6 +201,39 @@ static const char *board_full_name;
+ 
+ #if (IS_ENABLED(CONFIG_BOARD_LATE_INIT))
+ 
++static int setup_wwan(void)
++{
++	ofnode node;
++	struct udevice *dev;
++	struct gpio_desc rst, off, wake;
++	int ret;
++
++	node = ofnode_by_compatible(ofnode_null(), "board,wwan-control");
++	if (!ofnode_valid(node))
++		return -ENODEV;
++
++	ret = device_get_supply_regulator(NULL, "vcc-supply", &dev);
++	if (ret) {
++		printf("get regulator fail %d\n", ret);
++		return ret;
++	}
++
++	regulator_set_enable(dev, true);
++	mdelay(20);
++
++	gpio_request_by_name_nodev(node, "reset-gpios", 0, &rst, GPIOD_IS_OUT);
++	gpio_request_by_name_nodev(node, "off-gpios",   0, &off, GPIOD_IS_OUT);
++	gpio_request_by_name_nodev(node, "wake-gpios",  0, &wake, GPIOD_IS_IN);
++
++	/* power sequence */
++	dm_gpio_set_value(&off, 1);
++	dm_gpio_set_value(&rst, 0);
++	mdelay(50);
++	dm_gpio_set_value(&rst, 1);
++
++	return 0;
++}
++
+ static int env_append_bootargs(const char *append_args)
+ {
+ 	/* MAX_CMDLINE_SIZE taken from boot/bootm.c */
+@@ -255,6 +292,8 @@ int board_late_init(void)
+ 		} else {
+ 			board_name = "cortadodeck-720";
+ 			board_full_name = "Globalscale Cortadodeck 720";
++			/* reset 5g modem */
++			setup_wwan();
+ 		}
+ 		break;
+ 	}

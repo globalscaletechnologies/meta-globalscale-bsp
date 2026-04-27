@@ -1,0 +1,113 @@
+From b089b2f559f548f931ab11fbb2ad8709aada0041 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Tue, 21 Apr 2026 10:32:57 +0800
+Subject: [PATCH] configs: mt8391: add Cortadodeck firmware capsule UUIDs
+
+Add dedicated EFI capsule image GUID definitions for Globalscale
+Cortadodeck platforms, including FIT, FIP, BL2, FW and ENV images.
+---
+ board/mediatek/genio-720-evk/mt8391_evk.c | 42 ++++++++++++++++++++---
+ include/configs/mt8391.h                  | 20 +++++++++++
+ 2 files changed, 58 insertions(+), 4 deletions(-)
+
+diff --git a/board/mediatek/genio-720-evk/mt8391_evk.c b/board/mediatek/genio-720-evk/mt8391_evk.c
+index 5a771a395f..3dc2a7bcc7 100644
+--- a/board/mediatek/genio-720-evk/mt8391_evk.c
++++ b/board/mediatek/genio-720-evk/mt8391_evk.c
+@@ -81,6 +81,12 @@ static bool board_is_genio_720_evk_ufs_qspi(void)
+ 		of_machine_is_compatible("mediatek,genio-720-evk-ufs-qspi");
+ }
+ 
++static bool board_is_cortadodeck(void)
++{
++	return CONFIG_IS_ENABLED(TARGET_MT8391) &&
++		of_machine_is_compatible("globalscale,cortadodeck");
++}
++
+ void mediatek_capsule_update_board_setup(void)
+ {
+ 	fw_images[0].image_index = MT8391_FIT_IMAGE;
+@@ -143,6 +149,24 @@ void mediatek_capsule_update_board_setup(void)
+ 		fw_images[2].fw_name = u"GENIO-720-EVK-UFS-QSPI-BL2";
+ 		fw_images[3].fw_name = u"GENIO-720-EVK-UFS-QSPI-FW";
+ 		fw_images[4].fw_name = u"GENIO-720-EVK-UFS-QSPI-ENV";
++	} else if (board_is_cortadodeck()) {
++		efi_guid_t image_type_guid = CORTADODECK_FIT_IMAGE_GUID;
++		efi_guid_t uboot_image_type_guid = CORTADODECK_FIP_IMAGE_GUID;
++		efi_guid_t bl2_image_type_guid = CORTADODECK_BL2_IMAGE_GUID;
++		efi_guid_t fw_image_type_guid = CORTADODECK_FW_IMAGE_GUID;
++		efi_guid_t env_image_type_guid = CORTADODECK_ENV_IMAGE_GUID;
++
++		guidcpy(&fw_images[0].image_type_id, &image_type_guid);
++		guidcpy(&fw_images[1].image_type_id, &uboot_image_type_guid);
++		guidcpy(&fw_images[2].image_type_id, &bl2_image_type_guid);
++		guidcpy(&fw_images[3].image_type_id, &fw_image_type_guid);
++		guidcpy(&fw_images[4].image_type_id, &env_image_type_guid);
++
++		fw_images[0].fw_name = u"CORTADODECK-FIT";
++		fw_images[1].fw_name = u"CORTADODECK-FIP";
++		fw_images[2].fw_name = u"CORTADODECK-BL2";
++		fw_images[3].fw_name = u"CORTADODECK-FW";
++		fw_images[4].fw_name = u"CORTADODECK-ENV";
+ 	}
+ }
+ 
+@@ -215,13 +239,23 @@ int board_late_init(void)
+ 	part = mediatek_sip_part_name();
+ 	switch (part) {
+ 	case 0x8371:
+-		board_name = "genio-520-evk";
+-		board_full_name = "MediaTek Genio 520 EVK";
++		if (!board_is_cortadodeck()) {
++			board_name = "genio-520-evk";
++			board_full_name = "MediaTek Genio 520 EVK";
++		} else {
++			board_name = "cortadodeck-520";
++			board_full_name = "Globalscale Cortadodeck 520";
++		}
+ 		break;
+ 	case 0x8391:
+ 	default:
+-		board_name = "genio-720-evk";
+-		board_full_name = "MediaTek Genio 720 EVK";
++		if (!board_is_cortadodeck()) {
++			board_name = "genio-720-evk";
++			board_full_name = "MediaTek Genio 720 EVK";
++		} else {
++			board_name = "cortadodeck-720";
++			board_full_name = "Globalscale Cortadodeck 720";
++		}
+ 		break;
+ 	}
+ 
+diff --git a/include/configs/mt8391.h b/include/configs/mt8391.h
+index a43c81cbf8..00c439d886 100644
+--- a/include/configs/mt8391.h
++++ b/include/configs/mt8391.h
+@@ -65,6 +65,26 @@
+ 	EFI_GUID(0x9539d35a, 0xb4bf, 0x4479, 0x80, 0xec, \
+ 		 0x13, 0x53, 0x4f, 0x1e, 0x30, 0xe6)
+ 
++#define CORTADODECK_FIT_IMAGE_GUID \
++	EFI_GUID(0x6a8b1c2e, 0x4f91, 0x4d9a, 0x9c, 0x2b, \
++		 0x5e, 0x7a, 0x13, 0x8f, 0x44, 0x21)
++
++#define CORTADODECK_FIP_IMAGE_GUID \
++	EFI_GUID(0xb3d7f5a1, 0x2c68, 0x4bde, 0x81, 0x7f, \
++		 0x92, 0x44, 0xa9, 0x6c, 0x55, 0x3d)
++
++#define CORTADODECK_BL2_IMAGE_GUID \
++	EFI_GUID(0x91e2c4d8, 0x77ab, 0x43ef, 0xb2, 0x19, \
++		 0x63, 0x8a, 0xd1, 0x0f, 0x2e, 0x6a)
++
++#define CORTADODECK_FW_IMAGE_GUID \
++	EFI_GUID(0x3f9b7e22, 0x5d14, 0x4c6e, 0xa7, 0x88, \
++		 0x2a, 0x6e, 0x91, 0xb3, 0x4c, 0x0f)
++
++#define CORTADODECK_ENV_IMAGE_GUID \
++	EFI_GUID(0xd8a0c7b9, 0x1183, 0x4f6b, 0x90, 0x2e, \
++		 0x7c, 0x55, 0x29, 0xa4, 0x6d, 0x1b)
++
+ /* Environment settings */
+ #include <config_distro_bootcmd.h>
+ 
