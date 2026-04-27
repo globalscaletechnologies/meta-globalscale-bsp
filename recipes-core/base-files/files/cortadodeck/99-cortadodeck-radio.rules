@@ -1,0 +1,13 @@
+# Cortadodeck m.2 radio board
+
+# FTDI-FT4232H port A (Interface 0) for GPIO Control
+SUBSYSTEM=="tty", ENV{ID_PATH}=="platform-11270000.xhci4-usb-0:1.1:1.0", SYMLINK+="ttyGP_CTL"
+
+# FTDI-FT4232H port B (Interface 1) for Zigbee NCP
+SUBSYSTEM=="tty", ENV{ID_PATH}=="platform-11270000.xhci4-usb-0:1.1:1.1", SYMLINK+="ttyZB_NCP"
+
+# FTDI-FT4232H port C (Interface 2) for Openthread RCP
+SUBSYSTEM=="tty", ENV{ID_PATH}=="platform-11270000.xhci4-usb-0:1.1:1.2", SYMLINK+="ttyOT_RCP"
+
+# FTDI-FT4232H port D (Interface 3) for Z-Wave NCP
+SUBSYSTEM=="tty", ENV{ID_PATH}=="platform-11270000.xhci4-usb-0:1.1:1.3", SYMLINK+="ttyZW_NCP"
