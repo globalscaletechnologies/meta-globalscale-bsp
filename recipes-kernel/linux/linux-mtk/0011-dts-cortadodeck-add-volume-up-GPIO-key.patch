@@ -1,0 +1,51 @@
+From c6e07f556733c554f6668ce2372590c7375a9480 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Fri, 8 May 2026 09:36:34 +0800
+Subject: [PATCH 3/3] dts: cortadodeck: add volume up GPIO key
+
+---
+ .../boot/dts/mediatek/gti-cortadodeck.dts     | 21 +++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+index cf8f2b0cc448..f62c397065ba 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+@@ -277,6 +277,20 @@ wwan_3v3: wwan-3v3 {
+ 		enable-active-high;
+ 		regulator-always-on;
+ 	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gpio_keys_pins>;
++
++		key-volume-up {
++			gpios = <&pio 44 GPIO_ACTIVE_LOW>;
++			label = "volume_up";
++			linux,code = <KEY_VOLUMEUP>;
++			wakeup-source;
++			debounce-interval = <15>;
++		};
++	};
+ };
+ 
+ &mt6359_vmodem_buck_reg {
+@@ -1263,6 +1277,13 @@ pins-vdd-valid {
+ 			pinmux = <PINMUX_GPIO86__FUNC_GPIO86>;
+ 		};
+ 	};
++
++	gpio_keys_pins: gpio-keys-pins {
++		pins {
++			pinmux = <PINMUX_GPIO44__FUNC_GPIO44>;
++			input-enable;
++		};
++	};
+ };
+ 
+ &mmc0 {
+-- 
+2.43.0
+

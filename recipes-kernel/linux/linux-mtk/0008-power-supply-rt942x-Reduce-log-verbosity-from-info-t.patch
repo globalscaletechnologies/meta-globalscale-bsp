@@ -1,0 +1,310 @@
+From 50d8ed2c99a58c746252c5bca517b16d43f2bb27 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Wed, 29 Apr 2026 10:25:30 +0800
+Subject: [PATCH 2/2] power: supply: rt942x: Reduce log verbosity from info to
+ debug
+
+---
+ drivers/power/supply/rt942x_battery.c | 118 +++++++++++++-------------
+ 1 file changed, 59 insertions(+), 59 deletions(-)
+
+diff --git a/drivers/power/supply/rt942x_battery.c b/drivers/power/supply/rt942x_battery.c
+index 110edd83c5f3..98cc4051c6da 100644
+--- a/drivers/power/supply/rt942x_battery.c
++++ b/drivers/power/supply/rt942x_battery.c
+@@ -236,13 +236,13 @@ static int rt942x_unseal_wi_retry(struct rt942x_chip *chip, bool unseal)
+ retry:
+ 	regval = rt942x_reg_read_word(chip->i2c, RT942X_REG_FLAG3);
+ 	if ((regval & RT942X_UNSEAL_MASK) == status) {
+-		dev_info(chip->dev, "RT942x %s Pass\n",
++		dev_dbg(chip->dev, "RT942x %s Pass\n",
+ 				    unseal ? "Unseal" : "Seal");
+ 		ret = RT942X_UNSEAL_PASS;
+ 		goto out;
+ 	} else {
+ 		if (i > 0)
+-			dev_info(chip->dev, "RT942x %s Fail\n",
++			dev_dbg(chip->dev, "RT942x %s Fail\n",
+ 					    unseal ? "Unseal" : "Seal");
+ 		if (i++ >= retry_times)
+ 			goto out;
+@@ -629,7 +629,7 @@ static void rt942x_update_info(struct rt942x_chip *chip)
+ 	/* read OPCFG1~7 to check */
+ 	rt942x_read_page_cmd(chip, RT942X_PAGE_1);
+ 
+-	dev_info(chip->dev, "OPCFG1~5(0x%x 0x%x 0x%x 0x%x 0x%x)\n",
++	dev_dbg(chip->dev, "OPCFG1~5(0x%x 0x%x 0x%x 0x%x 0x%x)\n",
+ 		 rt942x_reg_read_word(chip->i2c, RT942X_REG_SWINDOW1),
+ 		 rt942x_reg_read_word(chip->i2c, RT942X_REG_SWINDOW2),
+ 		 rt942x_reg_read_word(chip->i2c, RT942X_REG_SWINDOW3),
+@@ -638,7 +638,7 @@ static void rt942x_update_info(struct rt942x_chip *chip)
+ 
+ 	rt942x_read_page_cmd(chip, RT942X_PAGE_10);
+ 
+-	dev_info(chip->dev, "OPCFG6~7(0x%x 0x%x)\n",
++	dev_dbg(chip->dev, "OPCFG6~7(0x%x 0x%x)\n",
+ 		 rt942x_reg_read_word(chip->i2c, RT942X_REG_SWINDOW1),
+ 		 rt942x_reg_read_word(chip->i2c, RT942X_REG_SWINDOW2));
+ 
+@@ -648,22 +648,22 @@ static void rt942x_update_info(struct rt942x_chip *chip)
+ 	regval = rt942x_reg_read_word(chip->i2c, RT942X_REG_SWINDOW1);
+ 	regval = (regval & 0x0300) >> 8;
+ 	if (flag2 & RT942X_USR_TBL_USED_MASK) {
+-		dev_info(chip->dev, "OCV table define by User\n");
++		dev_dbg(chip->dev, "OCV table define by User\n");
+ 	} else {
+ 		if (regval == 0)
+-			dev_info(chip->dev, "OCV(4200) EDV(3200)\n");
++			dev_dbg(chip->dev, "OCV(4200) EDV(3200)\n");
+ 		else if (regval == 1)
+-			dev_info(chip->dev, "OCV(4350) EDV(3200)\n");
++			dev_dbg(chip->dev, "OCV(4350) EDV(3200)\n");
+ 		else if (regval == 2)
+-			dev_info(chip->dev, "OCV(4400) EDV(3200)\n");
++			dev_dbg(chip->dev, "OCV(4400) EDV(3200)\n");
+ 		else
+-			dev_info(chip->dev, "OCV(4350) EDV(3400)\n");
++			dev_dbg(chip->dev, "OCV(4350) EDV(3400)\n");
+ 	}
+ 
+ 	regval = rt942x_reg_read_word(chip->i2c, RT942X_REG_SWINDOW5);
+-	dev_info(chip->dev, "CSCOMP4(%d)\n", regval);
++	dev_dbg(chip->dev, "CSCOMP4(%d)\n", regval);
+ 	regval = rt942x_reg_read_word(chip->i2c, RT942X_REG_SWINDOW4);
+-	dev_info(chip->dev, "CSCOMP5(%d)\n", regval);
++	dev_dbg(chip->dev, "CSCOMP5(%d)\n", regval);
+ 
+ 	regval_1 = rt942x_reg_read_word(chip->i2c, RT942X_REG_DC);
+ 	regval_2 = rt942x_reg_read_word(chip->i2c, RT942X_REG_FCC);
+@@ -674,9 +674,9 @@ static void rt942x_update_info(struct rt942x_chip *chip)
+ 		regval_2 = regval_2 * chip->pdata->rs_ic_setting /
+ 				      chip->pdata->rs_schematic;
+ 	}
+-	dev_info(chip->dev, "DSNCAP(%d) FCC(%d)\n", regval_1, regval_2);
++	dev_dbg(chip->dev, "DSNCAP(%d) FCC(%d)\n", regval_1, regval_2);
+ 
+-	dev_info(chip->dev, "VOLT_SOURCE(0x%x) INPUT_VOLT(%d) FG_VBAT(%d) FG_OCV(%d) FG_AV(%d)\n",
++	dev_dbg(chip->dev, "VOLT_SOURCE(0x%x) INPUT_VOLT(%d) FG_VBAT(%d) FG_OCV(%d) FG_AV(%d)\n",
+ 		chip->pdata->volt_source, rt942x_get_volt(chip),
+ 		rt942x_reg_read_word(chip->i2c, RT942X_REG_VBAT),
+ 		rt942x_reg_read_word(chip->i2c, RT942X_REG_OCV),
+@@ -691,85 +691,85 @@ static void rt942x_update_info(struct rt942x_chip *chip)
+ 		regval_2 = regval_2 * chip->pdata->rs_ic_setting /
+ 				      chip->pdata->rs_schematic;
+ 	}
+-	dev_info(chip->dev, "CURR_SOURCE(0x%x) INPUT_CURR(%d) FG_CURR(%d) FG_AI(%d)\n",
++	dev_dbg(chip->dev, "CURR_SOURCE(0x%x) INPUT_CURR(%d) FG_CURR(%d) FG_AI(%d)\n",
+ 		chip->pdata->curr_source, rt942x_get_current(chip), regval_1, regval_2);
+ 
+-	dev_info(chip->dev, "TEMP_SOURCE(0x%x) INPUT_TEMP(%d) FG_TEMP(%d)\n",
++	dev_dbg(chip->dev, "TEMP_SOURCE(0x%x) INPUT_TEMP(%d) FG_TEMP(%d)\n",
+ 			chip->pdata->temp_source, rt942x_get_temp(chip),
+ 			rt942x_reg_read_word(chip->i2c, RT942X_REG_TEMP));
+-	dev_info(chip->dev, "FG_FG_INTT(%d) FG_AT(%d)\n",
++	dev_dbg(chip->dev, "FG_FG_INTT(%d) FG_AT(%d)\n",
+ 		rt942x_reg_read_word(chip->i2c, RT942X_REG_INTT),
+ 		rt942x_reg_read_word(chip->i2c, RT942X_REG_AT));
+ 
+ 	flag1 = rt942x_reg_read_word(chip->i2c, RT942X_REG_FLAG1);
+-	dev_info(chip->dev, "FLAG1(0x%x)\n", flag1);
++	dev_dbg(chip->dev, "FLAG1(0x%x)\n", flag1);
+ 	if (((flag1 & 0x0200) >> 9) == 1)
+-		dev_info(chip->dev, "FC = 1\n");
++		dev_dbg(chip->dev, "FC = 1\n");
+ 	else
+-		dev_info(chip->dev, "FC = 0\n");
++		dev_dbg(chip->dev, "FC = 0\n");
+ 
+ 	if (((flag1 & 0x0004) >> 2) == 1)
+-		dev_info(chip->dev, "FD = 1\n");
++		dev_dbg(chip->dev, "FD = 1\n");
+ 	else
+-		dev_info(chip->dev, "FD = 0\n");
++		dev_dbg(chip->dev, "FD = 0\n");
+ 
+-	dev_info(chip->dev, "FLAG2(0x%x)\n", flag2);
++	dev_dbg(chip->dev, "FLAG2(0x%x)\n", flag2);
+ 
+ 	if (((flag2 & 0xE000) >> 13) == 0)
+-		dev_info(chip->dev, "Power_Mode (Active)\n");
++		dev_dbg(chip->dev, "Power_Mode (Active)\n");
+ 	else if (((flag2 & 0xE000) >> 13) == 1)
+-		dev_info(chip->dev, "Power_Mode (FST_RSP_ACT)\n");
++		dev_dbg(chip->dev, "Power_Mode (FST_RSP_ACT)\n");
+ 	else if (((flag2 & 0xE000) >> 13) == 2) {
+ 		if (chip->ic_ver == RT9426A_DEVICE_ID)
+-			dev_info(chip->dev, "Power_Mode (Shutdown)\n");
++			dev_dbg(chip->dev, "Power_Mode (Shutdown)\n");
+ 		else
+-			dev_info(chip->dev, "Power_Mode (Hibernate)\n");
++			dev_dbg(chip->dev, "Power_Mode (Hibernate)\n");
+ 	} else
+-		dev_info(chip->dev, "Power_Mode (Sleep)\n");
++		dev_dbg(chip->dev, "Power_Mode (Sleep)\n");
+ 
+ 	if (flag2 & RT942X_USR_TBL_USED_MASK)
+-		dev_info(chip->dev, "User_Define_Table (IN USE)\n");
++		dev_dbg(chip->dev, "User_Define_Table (IN USE)\n");
+ 	else
+-		dev_info(chip->dev, "User_Define_Table (NOT IN USE)\n");
++		dev_dbg(chip->dev, "User_Define_Table (NOT IN USE)\n");
+ 	if (flag2 >= 0 && flag2 & RT942X_BATPRES_MASK) {
+-		dev_info(chip->dev, "Battery_Status (Inserted)\n");
++		dev_dbg(chip->dev, "Battery_Status (Inserted)\n");
+ 		chip->present = 1;
+ 	} else {
+-		dev_info(chip->dev, "Battery_Status (Removed)\n");
++		dev_dbg(chip->dev, "Battery_Status (Removed)\n");
+ 		chip->present = 0;
+ 	}
+ 
+ 	if (((flag2 & 0x0001)) == 1)
+-		dev_info(chip->dev, "RLX = 1\n");
++		dev_dbg(chip->dev, "RLX = 1\n");
+ 	else
+-		dev_info(chip->dev, "RLX = 0\n");
++		dev_dbg(chip->dev, "RLX = 0\n");
+ 
+ 	regval = rt942x_reg_read_word(chip->i2c, RT942X_REG_FLAG3);
+-	dev_info(chip->dev, "FLAG3(0x%x)\n", regval);
++	dev_dbg(chip->dev, "FLAG3(0x%x)\n", regval);
+ 	if (((regval & 0x0100) >> 8) == 1)
+-		dev_info(chip->dev, "RI = 1\n");
++		dev_dbg(chip->dev, "RI = 1\n");
+ 	else
+-		dev_info(chip->dev, "RI = 0\n");
++		dev_dbg(chip->dev, "RI = 0\n");
+ 
+ 	if (((regval & RT942X_UNSEAL_MASK)) == RT942X_UNSEAL_STATUS)
+-		dev_info(chip->dev, "Unseal\n");
++		dev_dbg(chip->dev, "Unseal\n");
+ 	else
+-		dev_info(chip->dev, "Seal\n");
++		dev_dbg(chip->dev, "Seal\n");
+ 
+-	dev_info(chip->dev, "CYCCNT(%d)\n", rt942x_get_cyccnt(chip));
++	dev_dbg(chip->dev, "CYCCNT(%d)\n", rt942x_get_cyccnt(chip));
+ 
+ 	regval = rt942x_reg_read_word(chip->i2c, RT942X_REG_SOC);
+-	dev_info(chip->dev, "SOC(%d)\n", regval);
++	dev_dbg(chip->dev, "SOC(%d)\n", regval);
+ 
+ 	regval = rt942x_reg_read_word(chip->i2c, RT942X_REG_RM);
+ 	/* scaling for RT9426A only */
+ 	if (chip->ic_ver == RT9426A_DEVICE_ID)
+ 		regval = regval * chip->pdata->rs_ic_setting /
+ 				  chip->pdata->rs_schematic;
+-	dev_info(chip->dev, "RM(%d)\n", regval);
++	dev_dbg(chip->dev, "RM(%d)\n", regval);
+ 
+ 	regval = rt942x_reg_read_word(chip->i2c, RT942X_REG_SOH);
+-	dev_info(chip->dev, "SOH(%d)\n", regval);
++	dev_dbg(chip->dev, "SOH(%d)\n", regval);
+ // for test
+ 	if (st_charging == -1) {
+ 		power_supply_changed(chip->fg_psy);
+@@ -798,8 +798,8 @@ static irqreturn_t rt942x_irq_handler(int irqno, void *param)
+ {
+ 	struct rt942x_chip *chip = param;
+ 
+-	dev_info(chip->dev, "%s\n", __func__);
+-	dev_info(chip->dev, "FG_IRQ(0x%x) FG_FLAG1(0x%x) FG_FLAG2(0x%x) FG_FLAG3(0x%x)\n",
++	dev_dbg(chip->dev, "%s\n", __func__);
++	dev_dbg(chip->dev, "FG_IRQ(0x%x) FG_FLAG1(0x%x) FG_FLAG2(0x%x) FG_FLAG3(0x%x)\n",
+ 		rt942x_reg_read_word(chip->i2c, RT942X_REG_IRQ),
+ 		rt942x_reg_read_word(chip->i2c, RT942X_REG_FLAG1),
+ 		rt942x_reg_read_word(chip->i2c, RT942X_REG_FLAG2),
+@@ -852,31 +852,31 @@ static int rt_fg_get_property(struct power_supply *psy,
+ 	switch (psp) {
+ 	case POWER_SUPPLY_PROP_ONLINE:
+ 		val->intval = chip->online;
+-		dev_info(chip->dev, "psp_online = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_online = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_PRESENT:
+ 		val->intval = chip->present;
+-		dev_info(chip->dev, "psp_present = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_present = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_STATUS:
+ 		val->intval = rt942x_get_status(chip);
+-		dev_info(chip->dev, "psp_status = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_status = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_HEALTH:
+ 		val->intval = rt942x_get_health(chip);
+-		dev_info(chip->dev, "psp_health = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_health = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+ 		val->intval = rt942x_get_volt(chip);
+-		dev_info(chip->dev, "psp_volt_now = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_volt_now = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
+ 		val->intval = chip->pdata->battery_type;
+-		dev_info(chip->dev, "psp_volt_max_design = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_volt_max_design = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_CAPACITY:
+ 		val->intval = rt942x_reg_read_word(chip->i2c, RT942X_REG_SOC);
+-		dev_info(chip->dev, "psp_capacity = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_capacity = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
+ 		val->intval = rt942x_get_design_capacity(chip);
+@@ -884,24 +884,24 @@ static int rt_fg_get_property(struct power_supply *psy,
+ 		if (chip->ic_ver == RT9426A_DEVICE_ID)
+ 			val->intval = val->intval * chip->pdata->rs_ic_setting /
+ 						    chip->pdata->rs_schematic;
+-		dev_info(chip->dev, "psp_charge_full_design = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_charge_full_design = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_CURRENT_NOW:
+ 		val->intval = rt942x_get_current(chip);
+-		dev_info(chip->dev, "psp_curr_now = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_curr_now = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_TEMP:
+ 		val->intval = rt942x_get_temp(chip);
+-		dev_info(chip->dev, "psp_temp = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_temp = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
+ 		val->intval = rt942x_get_cyccnt(chip);
+-		dev_info(chip->dev, "psp_cyccnt = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_cyccnt = %d\n", val->intval);
+ 		break;
+ 	/* add for aging cv */
+ 	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
+ 		val->intval = chip->ocv_index;
+-		dev_info(chip->dev, "ocv index = %d\n", val->intval);
++		dev_dbg(chip->dev, "ocv index = %d\n", val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE:
+ 		mutex_lock(&chip->update_lock);
+@@ -920,7 +920,7 @@ static int rt_fg_get_property(struct power_supply *psy,
+ 		break;
+ 	case POWER_SUPPLY_PROP_ENERGY_NOW:
+ 		val->intval = rt942x_reg_read_word(chip->i2c, RT942X_REG_FCC);
+-		dev_info(chip->dev, "psp_energy_now = %d\n", val->intval);
++		dev_dbg(chip->dev, "psp_energy_now = %d\n", val->intval);
+ 		break;
+ 	default:
+ 		ret = -EINVAL;
+@@ -2488,10 +2488,10 @@ static void fg_update_work_func(struct work_struct *work)
+ {
+ 	struct rt942x_chip *chip = container_of(work, struct rt942x_chip, update_work.work);
+ 
+-	dev_info(chip->dev, "%s++\n", __func__);
++	dev_dbg(chip->dev, "%s++\n", __func__);
+ 	rt942x_update_info(chip);
+ 	queue_delayed_work(system_freezable_wq, &chip->update_work, 20 * HZ);
+-	dev_info(chip->dev, "%s--\n", __func__);
++	dev_dbg(chip->dev, "%s--\n", __func__);
+ }
+ 
+ static int rt942x_i2c_probe(struct i2c_client *i2c)
+-- 
+2.43.0
+
