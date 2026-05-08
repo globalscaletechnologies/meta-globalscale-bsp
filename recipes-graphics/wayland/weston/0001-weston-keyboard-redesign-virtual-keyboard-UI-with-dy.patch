@@ -1,0 +1,537 @@
+From f5505349fd15f8ee8848e787f7b0080d8828203e Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Wed, 6 May 2026 16:27:52 +0800
+Subject: [PATCH] weston-keyboard: redesign virtual keyboard UI with dynamic
+ Wayland scaling
+
+Upstream-Status: Inappropriate [embedded device customization]
+
+---
+ clients/keyboard.c | 330 +++++++++++++++++++++++++++++----------------
+ 1 file changed, 211 insertions(+), 119 deletions(-)
+
+diff --git a/clients/keyboard.c b/clients/keyboard.c
+index 49b94ba..21fdcdc 100644
+--- a/clients/keyboard.c
++++ b/clients/keyboard.c
+@@ -29,8 +29,10 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <math.h>
+ #include <errno.h>
+ 
++#include <wayland-client.h>
+ #include <linux/input.h>
+ #include <cairo.h>
+ 
+@@ -62,6 +64,11 @@ struct virtual_keyboard {
+ 	bool toplevel;
+ 	bool overlay;
+ 	struct zwp_input_panel_surface_v1 *ips;
++
++	/* Wayland wl_output tracking for dynamic sizing */
++	int current_output_width;
++	int pending_output_width;
++	int output_scale;
+ };
+ 
+ enum key_type {
+@@ -147,76 +154,36 @@ static const struct key normal_keys[] = {
+ };
+ 
+ static const struct key numeric_keys[] = {
+-	{ keytype_default, "1", "1", "1", 1},
+-	{ keytype_default, "2", "2", "2", 1},
+-	{ keytype_default, "3", "3", "3", 1},
+-	{ keytype_default, "4", "4", "4", 1},
+-	{ keytype_default, "5", "5", "5", 1},
+-	{ keytype_default, "6", "6", "6", 1},
+-	{ keytype_default, "7", "7", "7", 1},
+-	{ keytype_default, "8", "8", "8", 1},
+-	{ keytype_default, "9", "9", "9", 1},
+-	{ keytype_default, "0", "0", "0", 1},
+-	{ keytype_backspace, "<--", "<--", "<--", 2},
++	{ keytype_default, "+", "+", "+", 2},
++	{ keytype_default, "1", "1", "1", 2},
++	{ keytype_default, "2", "2", "2", 2},
++	{ keytype_default, "3", "3", "3", 2},
++	{ keytype_default, "%", "%", "%", 2},
++	{ keytype_backspace, "<-", "<-", "<-", 2},
++
++	{ keytype_default, "-", "-", "-", 2},
++	{ keytype_default, "4", "4", "4", 2},
++	{ keytype_default, "5", "5", "5", 2},
++	{ keytype_default, "6", "6", "6", 2},
++	{ keytype_default, "$", "$", "$", 2},
++	{ keytype_enter, "Enter", "Enter", "Enter", 2},
+ 
++	{ keytype_default, "*", "*", "*", 2},
++	{ keytype_default, "7", "7", "7", 2},
++	{ keytype_default, "8", "8", "8", 2},
++	{ keytype_default, "9", "9", "9", 2},
++	{ keytype_default, ".", ".", ".", 2},
++	{ keytype_default, "#", "#", "#", 2},
++
++	{ keytype_default, "/", "/", "/", 2},
++	{ keytype_default, "0", "0", "0", 2},
+ 	{ keytype_space, "", "", "", 4},
+-	{ keytype_enter, "Enter", "Enter", "Enter", 2},
+-	{ keytype_arrow_up, "/\\", "/\\", "/\\", 1},
++	{ keytype_arrow_up, "^", "^", "^", 1},
+ 	{ keytype_arrow_left, "<", "<", "<", 1},
+ 	{ keytype_arrow_right, ">", ">", ">", 1},
+-	{ keytype_arrow_down, "\\/", "\\/", "\\/", 1},
+-	{ keytype_style, "", "", "", 2}
++	{ keytype_arrow_down, "V", "V", "V", 1}
+ };
+ 
+-static const struct key arabic_keys[] = {
+-	{ keytype_default, "ض", "ﹶ", "۱", 1},
+-	{ keytype_default, "ص", "ﹰ", "۲", 1},
+-	{ keytype_default, "ث", "ﹸ", "۳", 1},
+-	{ keytype_default, "ق", "ﹲ", "۴", 1},
+-	{ keytype_default, "ف", "ﻹ", "۵", 1},
+-	{ keytype_default, "غ", "ﺇ", "۶", 1},
+-	{ keytype_default, "ع", "`", "۷", 1},
+-	{ keytype_default, "ه", "٪", "۸", 1},
+-	{ keytype_default, "خ", ">", "۹", 1},
+-	{ keytype_default, "ح", "<", "۰", 1},
+-	{ keytype_backspace, "-->", "-->", "-->", 2},
+-
+-	{ keytype_tab, "->|", "->|", "->|", 1},
+-	{ keytype_default, "ش", "ﹺ", "ﹼ", 1},
+-	{ keytype_default, "س", "ﹴ", "!", 1},
+-	{ keytype_default, "ي", "[", "@", 1},
+-	{ keytype_default, "ب", "]", "#", 1},
+-	{ keytype_default, "ل", "ﻷ", "$", 1},
+-	{ keytype_default, "ا", "أ", "%", 1},
+-	{ keytype_default, "ت", "-", "^", 1},
+-	{ keytype_default, "ن", "x", "&", 1},
+-	{ keytype_default, "م", "/", "*", 1},
+-	{ keytype_default, "ك", ":", "_", 1},
+-	{ keytype_default, "د", "\"", "+", 1},
+-	{ keytype_enter, "Enter", "Enter", "Enter", 2},
+-
+-	{ keytype_switch, "Shift", "Base", "Shift", 2},
+-	{ keytype_default, "ئ", "~", ")", 1},
+-	{ keytype_default, "ء", "°", "(", 1},
+-	{ keytype_default, "ؤ", "{", "\"", 1},
+-	{ keytype_default, "ر", "}", "\'", 1},
+-	{ keytype_default, "ى", "ﺁ", "؟", 1},
+-	{ keytype_default, "ة", "'", "!", 1},
+-	{ keytype_default, "و", ",", ";", 1},
+-	{ keytype_default, "ﺯ", ".", "\\", 1},
+-	{ keytype_default, "ظ", "؟", "=", 1},
+-	{ keytype_switch, "Shift", "Base", "Shift", 2},
+-
+-	{ keytype_symbols, "؟٣٢١", "؟٣٢١", "Base", 1},
+-	{ keytype_default, "ﻻ", "ﻵ", "|", 1},
+-	{ keytype_default, ",", "،", "،", 1},
+-	{ keytype_space, "", "", "", 6},
+-	{ keytype_default, ".", "ذ", "]", 1},
+-	{ keytype_default, "ط", "ﺝ", "[", 1},
+-	{ keytype_style, "", "", "", 2}
+-};
+-
+-
+ static const struct layout normal_layout = {
+ 	normal_keys,
+ 	sizeof(normal_keys) / sizeof(*normal_keys),
+@@ -230,20 +197,11 @@ static const struct layout numeric_layout = {
+ 	numeric_keys,
+ 	sizeof(numeric_keys) / sizeof(*numeric_keys),
+ 	12,
+-	2,
++	4,
+ 	"en",
+ 	ZWP_TEXT_INPUT_V1_TEXT_DIRECTION_LTR
+ };
+ 
+-static const struct layout arabic_layout = {
+-	arabic_keys,
+-	sizeof(arabic_keys) / sizeof(*arabic_keys),
+-	13,
+-	4,
+-	"ar",
+-	ZWP_TEXT_INPUT_V1_TEXT_DIRECTION_RTL
+-};
+-
+ static const char *style_labels[] = {
+ 	"default",
+ 	"none",
+@@ -255,9 +213,6 @@ static const char *style_labels[] = {
+ 	"incorrect"
+ };
+ 
+-static const double key_width = 60;
+-static const double key_height = 50;
+-
+ enum keyboard_state {
+ 	KEYBOARD_STATE_DEFAULT,
+ 	KEYBOARD_STATE_UPPERCASE,
+@@ -270,6 +225,9 @@ struct keyboard {
+ 	struct widget *widget;
+ 
+ 	enum keyboard_state state;
++
++	/* Track the currently pressed key for the highlight effect */
++	const struct key *pressed_key;
+ };
+ 
+ static void __attribute__ ((format (printf, 1, 2)))
+@@ -303,39 +261,76 @@ label_from_key(struct keyboard *keyboard,
+ 	return "";
+ }
+ 
++/* Helper function to draw rounded rectangles for a modern UI look */
++static void
++cairo_rounded_rectangle(cairo_t *cr, double x, double y, double width, double height, double radius)
++{
++	cairo_new_sub_path(cr);
++	cairo_arc(cr, x + width - radius, y + radius, radius, -M_PI/2, 0);
++	cairo_arc(cr, x + width - radius, y + height - radius, radius, 0, M_PI/2);
++	cairo_arc(cr, x + radius, y + height - radius, radius, M_PI/2, M_PI);
++	cairo_arc(cr, x + radius, y + radius, radius, M_PI, 3*M_PI/2);
++	cairo_close_path(cr);
++}
++
+ static void
+ draw_key(struct keyboard *keyboard,
+ 	 const struct key *key,
+ 	 cairo_t *cr,
+ 	 unsigned int row,
+-	 unsigned int col)
++	 unsigned int col,
++	 double kw, double kh)
+ {
+ 	const char *label;
+ 	cairo_text_extents_t extents;
++	double padding_x = 4.0;
++	double padding_y = 6.0;
++	double radius = 5.0;
++	double key_rect_width = key->width * kw;
++	double key_rect_height = kh;
++
++	double x = col * kw + padding_x;
++	double y = row * kh + padding_y;
++	double w = key_rect_width - padding_x * 2;
++	double h = key_rect_height - padding_y * 2;
+ 
+ 	cairo_save(cr);
+-	cairo_rectangle(cr,
+-			col * key_width, row * key_height,
+-			key->width * key_width, key_height);
+-	cairo_clip(cr);
+ 
+-	/* Paint frame */
+-	cairo_rectangle(cr,
+-			col * key_width, row * key_height,
+-			key->width * key_width, key_height);
+-	cairo_set_line_width(cr, 3);
++	cairo_rounded_rectangle(cr, x, y, w, h, radius);
++
++	cairo_pattern_t *pat = cairo_pattern_create_linear(x, y, x, y + h);
++
++	if (keyboard->pressed_key == key) {
++		cairo_pattern_add_color_stop_rgb(pat, 0.0, 0.65, 0.65, 0.65);
++		cairo_pattern_add_color_stop_rgb(pat, 1.0, 0.75, 0.75, 0.75);
++	} else {
++		if (key->key_type == keytype_default || key->key_type == keytype_space) {
++			cairo_pattern_add_color_stop_rgb(pat, 0.0, 0.98, 0.98, 0.98);
++			cairo_pattern_add_color_stop_rgb(pat, 1.0, 0.82, 0.82, 0.82);
++		} else {
++			cairo_pattern_add_color_stop_rgb(pat, 0.0, 0.78, 0.78, 0.78);
++			cairo_pattern_add_color_stop_rgb(pat, 1.0, 0.60, 0.60, 0.60);
++		}
++	}
++
++	cairo_set_source(cr, pat);
++	cairo_fill_preserve(cr);
++
++	cairo_set_source_rgb(cr, 0.45, 0.45, 0.45);
++	cairo_set_line_width(cr, 1.0);
+ 	cairo_stroke(cr);
+ 
+-	/* Paint text */
++	cairo_pattern_destroy(pat);
++
+ 	label = label_from_key(keyboard, key);
+ 	cairo_text_extents(cr, label, &extents);
+ 
++	cairo_set_source_rgb(cr, 0.1, 0.1, 0.1);
++
++	cairo_translate(cr, col * kw, row * kh);
+ 	cairo_translate(cr,
+-			col * key_width,
+-			row * key_height);
+-	cairo_translate(cr,
+-			(key->width * key_width - extents.width) / 2,
+-			(key_height - extents.y_bearing) / 2);
++			(key_rect_width - extents.width) / 2,
++			(key_rect_height - extents.y_bearing) / 2);
+ 	cairo_show_text(cr, label);
+ 
+ 	cairo_restore(cr);
+@@ -349,11 +344,7 @@ get_current_layout(struct virtual_keyboard *keyboard)
+ 		case ZWP_TEXT_INPUT_V1_CONTENT_PURPOSE_NUMBER:
+ 			return &numeric_layout;
+ 		default:
+-			if (keyboard->preferred_language &&
+-			    strcmp(keyboard->preferred_language, "ar") == 0)
+-				return &arabic_layout;
+-			else
+-				return &normal_layout;
++			return &normal_layout;
+ 	}
+ }
+ 
+@@ -373,25 +364,32 @@ redraw_handler(struct widget *widget, void *data)
+ 	surface = window_get_surface(keyboard->window);
+ 	widget_get_allocation(keyboard->widget, &allocation);
+ 
++	/* Calculate perfect key sizes based on actual window buffer allocation! */
++	double current_kw = (double)allocation.width / layout->columns;
++	double current_kh = (double)allocation.height / layout->rows;
++
+ 	cr = cairo_create(surface);
+ 	cairo_rectangle(cr, allocation.x, allocation.y, allocation.width, allocation.height);
+ 	cairo_clip(cr);
+ 
++	/* Dynamic font size scaled with the key height */
++	double font_size = current_kh * 0.3;
++	if (font_size > 22.0) font_size = 22.0; /* Cap max font size */
++
+ 	cairo_select_font_face(cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+-	cairo_set_font_size(cr, 16);
++	cairo_set_font_size(cr, font_size);
+ 
+ 	cairo_translate(cr, allocation.x, allocation.y);
+ 
+ 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+-	cairo_set_source_rgba(cr, 1, 1, 1, 0.75);
+-	cairo_rectangle(cr, 0, 0, layout->columns * key_width, layout->rows * key_height);
++	cairo_set_source_rgba(cr, 0.80, 0.80, 0.80, 1.0);
++	cairo_rectangle(cr, 0, 0, allocation.width, allocation.height);
+ 	cairo_paint(cr);
+ 
+ 	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+ 
+ 	for (i = 0; i < layout->count; ++i) {
+-		cairo_set_source_rgb(cr, 0, 0, 0);
+-		draw_key(keyboard, &layout->keys[i], cr, row, col);
++		draw_key(keyboard, &layout->keys[i], cr, row, col, current_kw, current_kh);
+ 		col += layout->keys[i].width;
+ 		if (col >= layout->columns) {
+ 			row += 1;
+@@ -539,6 +537,12 @@ keyboard_handle_key(struct keyboard *keyboard, uint32_t time, const struct key *
+ {
+ 	const char *label = NULL;
+ 
++	/* Update pressed key state for rendering highlight */
++	if (state == WL_POINTER_BUTTON_STATE_PRESSED)
++		keyboard->pressed_key = key;
++	else
++		keyboard->pressed_key = NULL;
++
+ 	switch(keyboard->state) {
+ 	case KEYBOARD_STATE_DEFAULT :
+ 		label = key->label;
+@@ -683,13 +687,16 @@ button_handler(struct widget *widget,
+ 	}
+ 
+ 	input_get_position(input, &x, &y);
+-
+ 	widget_get_allocation(keyboard->widget, &allocation);
++
++	double current_kw = (double)allocation.width / layout->columns;
++	double current_kh = (double)allocation.height / layout->rows;
++
+ 	x -= allocation.x;
+ 	y -= allocation.y;
+ 
+-	row = y / key_height;
+-	col = x / key_width + row * layout->columns;
++	row = y / current_kh;
++	col = x / current_kw + row * layout->columns;
+ 	for (i = 0; i < layout->count; ++i) {
+ 		col -= layout->keys[i].width;
+ 		if (col < 0) {
+@@ -715,11 +722,14 @@ touch_handler(struct input *input, uint32_t time,
+ 
+ 	widget_get_allocation(keyboard->widget, &allocation);
+ 
++	double current_kw = (double)allocation.width / layout->columns;
++	double current_kh = (double)allocation.height / layout->rows;
++
+ 	x -= allocation.x;
+ 	y -= allocation.y;
+ 
+-	row = (int)y / key_height;
+-	col = (int)x / key_width + row * layout->columns;
++	row = (int)y / current_kh;
++	col = (int)x / current_kw + row * layout->columns;
+ 	for (i = 0; i < layout->count; ++i) {
+ 		col -= layout->keys[i].width;
+ 		if (col < 0) {
+@@ -824,9 +834,12 @@ handle_commit_state(void *data,
+ 	if (keyboard->surrounding_text)
+ 		dbg("Surrounding text updated: %s\n", keyboard->surrounding_text);
+ 
+-	window_schedule_resize(keyboard->keyboard->window,
+-			       layout->columns * key_width,
+-			       layout->rows * key_height);
++	/*
++	 * CRITICAL FIX: DO NOT call window_schedule_resize here!
++	 * The window height should remain completely static to prevent Wayland
++	 * surface placement bugs. The drawing logic will automatically stretch
++	 * the buttons to fill the fixed height allocation.
++	 */
+ 
+ 	zwp_input_method_context_v1_language(context,
+ 					     keyboard->serial,
+@@ -905,10 +918,6 @@ input_method_activate(void *data,
+ 
+ 	layout = get_current_layout(keyboard);
+ 
+-	window_schedule_resize(keyboard->keyboard->window,
+-			       layout->columns * key_width,
+-			       layout->rows * key_height);
+-
+ 	zwp_input_method_context_v1_language(context,
+ 					     keyboard->serial,
+ 					     layout->language);
+@@ -938,6 +947,73 @@ static const struct zwp_input_method_v1_listener input_method_listener = {
+ 	input_method_deactivate
+ };
+ 
++/* --- Wayland wl_output listeners for dynamic sizing --- */
++static void
++output_handle_geometry(void *data, struct wl_output *wl_output,
++		       int32_t x, int32_t y,
++		       int32_t physical_width, int32_t physical_height,
++		       int32_t subpixel,
++		       const char *make, const char *model,
++		       int32_t transform)
++{
++}
++
++static void
++output_handle_mode(void *data, struct wl_output *wl_output,
++		   uint32_t flags, int32_t width, int32_t height,
++		   int32_t refresh)
++{
++	struct virtual_keyboard *vk = data;
++	if (flags & WL_OUTPUT_MODE_CURRENT) {
++		vk->pending_output_width = width;
++	}
++}
++
++static void
++output_handle_done(void *data, struct wl_output *wl_output)
++{
++	struct virtual_keyboard *vk = data;
++	int scale = vk->output_scale > 0 ? vk->output_scale : 1;
++
++	/* Calculate logical width for Wayland surface */
++	int logical_width = vk->pending_output_width / scale;
++
++	if (logical_width > 0 && vk->current_output_width != logical_width) {
++		vk->current_output_width = logical_width;
++
++		if (vk->keyboard && vk->keyboard->window) {
++			/* Force the Window Height to be FIXED and independent of layout!
++			   We always allocate space for 4 rows. Max height capped to avoid huge UI */
++			double base_kw = (double)logical_width / 12.0;
++			double base_kh = base_kw * 1.0;
++			if (base_kh > 70.0) base_kh = 70.0;
++
++			double fixed_window_height = 4.0 * base_kh;
++
++			window_schedule_resize(vk->keyboard->window,
++					       logical_width,
++					       fixed_window_height);
++			widget_schedule_redraw(vk->keyboard->widget);
++		}
++	}
++}
++
++static void
++output_handle_scale(void *data, struct wl_output *wl_output,
++		    int32_t factor)
++{
++	struct virtual_keyboard *vk = data;
++	vk->output_scale = factor;
++}
++
++static const struct wl_output_listener output_listener = {
++	output_handle_geometry,
++	output_handle_mode,
++	output_handle_done,
++	output_handle_scale
++};
++/* -------------------------------------------------------- */
++
+ static void
+ global_handler(struct display *display, uint32_t name,
+ 	       const char *interface, uint32_t version, void *data)
+@@ -954,6 +1030,10 @@ global_handler(struct display *display, uint32_t name,
+ 		zwp_input_method_v1_add_listener(keyboard->input_method,
+ 						 &input_method_listener,
+ 						 keyboard);
++	} else if (!strcmp(interface, "wl_output")) {
++		struct wl_output *wl_output =
++			display_bind(display, name, &wl_output_interface, 2);
++		wl_output_add_listener(wl_output, &output_listener, keyboard);
+ 	}
+ }
+ 
+@@ -993,9 +1073,18 @@ static void
+ keyboard_create(struct virtual_keyboard *virtual_keyboard)
+ {
+ 	struct keyboard *keyboard;
+-	const struct layout *layout;
+ 
+-	layout = get_current_layout(virtual_keyboard);
++	/* Fallback width if wl_output is slow. */
++	double initial_width = 800.0;
++	if (virtual_keyboard->current_output_width > 0) {
++		initial_width = (double)virtual_keyboard->current_output_width;
++	}
++
++	/* Force initial window height to be 4 rows */
++	double base_kw = initial_width / 12.0;
++	double base_kh = base_kw * 1.0;
++	if (base_kh > 70.0) base_kh = 70.0;
++	double fixed_window_height = 4.0 * base_kh;
+ 
+ 	keyboard = xzalloc(sizeof *keyboard);
+ 	keyboard->keyboard = virtual_keyboard;
+@@ -1019,8 +1108,8 @@ keyboard_create(struct virtual_keyboard *virtual_keyboard)
+ 	widget_set_touch_up_handler(keyboard->widget, touch_up_handler);
+ 
+ 	window_schedule_resize(keyboard->window,
+-			       layout->columns * key_width,
+-			       layout->rows * key_height);
++			       initial_width,
++			       fixed_window_height);
+ 
+ 	display_set_output_configure_handler(virtual_keyboard->display,
+ 					     display_output_handler);
+@@ -1049,6 +1138,7 @@ main(int argc, char *argv[])
+ 	struct virtual_keyboard virtual_keyboard;
+ 
+ 	memset(&virtual_keyboard, 0, sizeof virtual_keyboard);
++	virtual_keyboard.output_scale = 1;
+ 
+ 	virtual_keyboard.display = display_create(&argc, argv);
+ 	if (virtual_keyboard.display == NULL) {
+@@ -1060,6 +1150,8 @@ main(int argc, char *argv[])
+ 	display_set_user_data(virtual_keyboard.display, &virtual_keyboard);
+ 	display_set_global_handler(virtual_keyboard.display, global_handler);
+ 
++	wl_display_roundtrip(display_get_display(virtual_keyboard.display));
++
+ 	if (virtual_keyboard.input_panel == NULL) {
+ 		fprintf(stderr, "No input panel global\n");
+ 		return -1;
