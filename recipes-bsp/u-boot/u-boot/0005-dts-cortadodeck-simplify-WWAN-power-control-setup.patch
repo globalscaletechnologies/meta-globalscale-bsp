@@ -1,0 +1,71 @@
+From 136d7933412c1325bca8594e98d8121ba62cb38c Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 7 May 2026 14:15:26 +0800
+Subject: [PATCH 1/2] dts: cortadodeck: simplify WWAN power control setup
+
+Remove custom WWAN control node and switch to using
+regulator-boot-on for automatic WWAN 3.3V enable during
+boot.
+
+Also convert WWAN reset/off control signals into GPIO hogs
+to ensure proper default output states before driver init.
+---
+ arch/arm/dts/gti-cortadodeck.dts | 27 ++++++++++++++++-----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/dts/gti-cortadodeck.dts b/arch/arm/dts/gti-cortadodeck.dts
+index a99114227b..e72e240abb 100644
+--- a/arch/arm/dts/gti-cortadodeck.dts
++++ b/arch/arm/dts/gti-cortadodeck.dts
+@@ -210,18 +210,9 @@
+ 		regulator-name = "wwan_3v3";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&pio 86 GPIO_ACTIVE_HIGH>;
++		gpio = <&gpio 86 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+-		startup-delay-us = <10000>;
+-	};
+-
+-	wwan {
+-		compatible = "board,wwan-control";
+-		vcc-supply = <&wwan_3v3>;
+-		reset-gpios = <&iop1 4 GPIO_ACTIVE_HIGH>;
+-		off-gpios = <&iop3 4 GPIO_ACTIVE_HIGH>;
+-		wake-gpios = <&iop2 2 GPIO_ACTIVE_HIGH>;
+-		status = "okay";
++		regulator-boot-on;
+ 	};
+ };
+ 
+@@ -435,6 +426,13 @@
+ 			gpios = <3 GPIO_ACTIVE_HIGH>;
+ 			line-name = "vbat2sys";
+ 		};
++
++		wwan_rst {
++			gpio-hog;
++			output-high;
++			gpios = <4 GPIO_ACTIVE_HIGH>;
++			line-name = "wwan_rst";
++		};
+ 	};
+ 
+ 	iop2: pca9554@3d {
+@@ -478,6 +476,13 @@
+ 			line-name = "pa_en";
+ 		};
+ 
++		wwan_off {
++			gpio-hog;
++			output-high;
++			gpios = <4 GPIO_ACTIVE_HIGH>;
++			line-name = "wwan_off";
++		};
++
+ 		cam_en {
+ 			gpio-hog;
+ 			output-high;
+-- 
+2.43.0
+

@@ -1,0 +1,73 @@
+From 91f720bf75ba1b373c43f74b50d23e8d07481252 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 7 May 2026 14:16:17 +0800
+Subject: [PATCH 2/2] board: cortadodeck: switch WWAN init to regulator autoset
+
+Simplify WWAN initialization by removing the custom
+board,wwan-control DT handling and manual GPIO-based
+power sequencing.
+
+Use regulator_list_autoset() to enable the WWAN 3.3V
+supply through the standard regulator framework instead.
+---
+ board/mediatek/genio-720-evk/mt8391_evk.c | 31 ++++++-----------------
+ 1 file changed, 8 insertions(+), 23 deletions(-)
+
+diff --git a/board/mediatek/genio-720-evk/mt8391_evk.c b/board/mediatek/genio-720-evk/mt8391_evk.c
+index c04e8a87fd..234f57bf30 100644
+--- a/board/mediatek/genio-720-evk/mt8391_evk.c
++++ b/board/mediatek/genio-720-evk/mt8391_evk.c
+@@ -203,34 +203,19 @@ static const char *board_full_name;
+ 
+ static int setup_wwan(void)
+ {
+-	ofnode node;
+-	struct udevice *dev;
+-	struct gpio_desc rst, off, wake;
++	struct udevice *regulator;
+ 	int ret;
+ 
+-	node = ofnode_by_compatible(ofnode_null(), "board,wwan-control");
+-	if (!ofnode_valid(node))
+-		return -ENODEV;
++	static const char * const wwan_regulators[] = {
++		"wwan_3v3",
++		NULL,
++	};
+ 
+-	ret = device_get_supply_regulator(NULL, "vcc-supply", &dev);
++	ret = regulator_list_autoset(wwan_regulators, NULL, false);
+ 	if (ret) {
+-		printf("get regulator fail %d\n", ret);
++		printf("Unable to init all wwan regulators %d\n", ret);
+ 		return ret;
+ 	}
+-
+-	regulator_set_enable(dev, true);
+-	mdelay(20);
+-
+-	gpio_request_by_name_nodev(node, "reset-gpios", 0, &rst, GPIOD_IS_OUT);
+-	gpio_request_by_name_nodev(node, "off-gpios",   0, &off, GPIOD_IS_OUT);
+-	gpio_request_by_name_nodev(node, "wake-gpios",  0, &wake, GPIOD_IS_IN);
+-
+-	/* power sequence */
+-	dm_gpio_set_value(&off, 1);
+-	dm_gpio_set_value(&rst, 0);
+-	mdelay(50);
+-	dm_gpio_set_value(&rst, 1);
+-
+ 	return 0;
+ }
+ 
+@@ -292,7 +277,7 @@ int board_late_init(void)
+ 		} else {
+ 			board_name = "cortadodeck-720";
+ 			board_full_name = "Globalscale Cortadodeck 720";
+-			/* reset 5g modem */
++			/* setup 5g modem */
+ 			setup_wwan();
+ 		}
+ 		break;
+-- 
+2.43.0
+
