@@ -1,0 +1,135 @@
+From d750e352675c4491ad91f96240b8711d69812fbd Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 28 May 2026 16:54:52 +0800
+Subject: [PATCH] alsa-ucm-conf: update mt8391-evk audio routing for
+ cortadodeck board
+
+- Add builtin speaker amp control
+- Update headset and onboard mic settings
+- Adjust playback/capture channel configuration
+- Tune PGA1 volume handling
+---
+ ucm2/MediaTek/mt8391-evk/HiFi.conf | 47 ++++++++++--------------------
+ 1 file changed, 16 insertions(+), 31 deletions(-)
+
+diff --git a/ucm2/MediaTek/mt8391-evk/HiFi.conf b/ucm2/MediaTek/mt8391-evk/HiFi.conf
+index 4a1aee9..5239033 100644
+--- a/ucm2/MediaTek/mt8391-evk/HiFi.conf
++++ b/ucm2/MediaTek/mt8391-evk/HiFi.conf
+@@ -1,21 +1,23 @@
+ SectionDevice."Speaker" {
+-	Comment "Lineout speaker"
++	Comment "Builtin speaker"
+ 
+ 	ConflictingDevice [
+ 		"Headphones"
+ 	]
+ 
+ 	EnableSequence [
+-		cset "name='LOL Mux' Playback_L_DAC"
++		cset "name='HP Mux' Audio Playback"
++		cset "name='Ext_Speaker_Amp Switch' 1"
+ 	]
+ 
+ 	DisableSequence [
+-		cset "name='LOL Mux' Open"
++		cset "name='Ext_Speaker_Amp Switch' 0"
++		cset "name='HP Mux' Open"
+ 	]
+ 
+ 	Value {
+ 		PlaybackPriority 300
+-		PlaybackChannels 1
++		PlaybackChannels 2
+ 		PlaybackPCM "hw:${CardId},${var:PlayDevN}"
+ 	}
+ }
+@@ -28,6 +30,7 @@ SectionDevice."Headphones" {
+ 	]
+ 
+ 	EnableSequence [
++		cset "name='Ext_Speaker_Amp Switch' 0"
+ 		cset "name='HP Mux' Audio Playback"
+ 	]
+ 
+@@ -51,6 +54,8 @@ SectionDevice."Headset" {
+ 	]
+ 
+ 	EnableSequence [
++		cset "name='Headset_Mic_Switch' 'Headset Mic'"
++		cset "name='PGA1 Volume' 4"
+ 		cset "name='MISO0_MUX' UL1_CH1"
+ 		cset "name='ADC_L_Mux' Left Preamplifier"
+ 		cset "name='PGA_L_Mux' AIN1"
+@@ -59,6 +64,7 @@ SectionDevice."Headset" {
+ 	DisableSequence [
+ 		cset "name='ADC_L_Mux' Idle"
+ 		cset "name='PGA_L_Mux' None"
++		cset "name='PGA1 Volume' 0"
+ 	]
+ 
+ 	Value {
+@@ -70,31 +76,29 @@ SectionDevice."Headset" {
+ }
+ 
+ SectionDevice."Mic1" {
+-	Comment "Analog microphone"
++	Comment "Builtin microphone"
+ 
+ 	ConflictingDevice [
+ 		"Headset"
+ 	]
+ 
+ 	EnableSequence [
++		cset "name='Headset_Mic_Switch' 'Onboard Mic'"
++		cset "name='PGA1 Volume' 4"
+ 		cset "name='MISO0_MUX' UL1_CH1"
+-		cset "name='MISO1_MUX' UL1_CH2"
+ 		cset "name='ADC_L_Mux' Left Preamplifier"
+-		cset "name='ADC_R_Mux' Right Preamplifier"
+-		cset "name='PGA_L_Mux' AIN0"
+-		cset "name='PGA_R_Mux' AIN2"
++		cset "name='PGA_L_Mux' AIN1"
+ 	]
+ 
+ 	DisableSequence [
+ 		cset "name='ADC_L_Mux' Idle"
+-		cset "name='ADC_R_Mux' Idle"
+ 		cset "name='PGA_L_Mux' None"
+-		cset "name='PGA_R_Mux' None"
++		cset "name='PGA1 Volume' 0"
+ 	]
+ 
+ 	Value {
+ 		CapturePriority 400
+-		CaptureChannels 2
++		CaptureChannels 1
+ 		CapturePCM "hw:${CardId},${var:CapDevN}"
+ 	}
+ }
+@@ -129,22 +133,3 @@ SectionDevice."Line2" {
+ 	}
+ }
+ 
+-SectionDevice."Line3" {
+-	Comment "I2S input"
+-
+-	Value {
+-		CapturePriority 100
+-		CaptureChannels 2
+-		CapturePCM "hw:${CardId},3"
+-	}
+-}
+-
+-SectionDevice."Line4" {
+-	Comment "I2S output"
+-
+-	Value {
+-		PlaybackPriority 100
+-		PlaybackChannels 2
+-		PlaybackPCM "hw:${CardId},1"
+-	}
+-}
+-- 
+2.43.0
+
