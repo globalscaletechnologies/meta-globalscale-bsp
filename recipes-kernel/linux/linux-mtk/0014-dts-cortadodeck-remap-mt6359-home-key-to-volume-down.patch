@@ -1,0 +1,29 @@
+From 0de066c307c326e303bace30941102292cddd916 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 1 Jun 2026 13:42:42 +0800
+Subject: [PATCH 2/2] dts: cortadodeck: remap mt6359 home key to volume down
+
+---
+ arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+index 61219815b9d9..6d50a2bc725d 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+@@ -293,6 +293,12 @@ key-volume-up {
+ 	};
+ };
+ 
++&mt6359keys {
++	home {
++		linux,keycodes = <KEY_VOLUMEDOWN>;
++	};
++};
++
+ &mt6359_vmodem_buck_reg {
+ 	regulator-always-on;
+ };
+-- 
+2.43.0
+

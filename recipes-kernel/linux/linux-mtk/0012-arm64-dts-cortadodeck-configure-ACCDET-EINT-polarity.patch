@@ -1,0 +1,29 @@
+From 927a418aabaa36109c4278e92b61c5eb2a12e849 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 28 May 2026 16:59:52 +0800
+Subject: [PATCH] arm64: dts: cortadodeck: configure ACCDET EINT polarity
+
+- Add mediatek,eint-level-pol setting for accdet
+- Configure headset detection interrupt polarity
+---
+ arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+index f62c397065ba..f2b43f0309da 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+@@ -1673,6 +1673,10 @@ &afe {
+ 	status = "okay";
+ };
+ 
++&accdet {
++	mediatek,eint-level-pol = <4>;
++};
++
+ &sound {
+ 	compatible = "mediatek,mt8189-mt6359p-sound";
+ 	model = "mt8391-evk";
+-- 
+2.43.0
+

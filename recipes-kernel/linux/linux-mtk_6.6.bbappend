@@ -18,4 +18,7 @@ SRC_URI:append:cortadodeck = " \
     file://0009-power-supply-rt942x-report-battery-values-in-correct.patch \
     file://0010-power-supply-rt9467-add-charger-event-handling-and-D.patch \
     file://0011-dts-cortadodeck-add-volume-up-GPIO-key.patch \
+    file://0012-arm64-dts-cortadodeck-configure-ACCDET-EINT-polarity.patch \
+    file://0013-dts-cortadodeck-adjust-backlight-PWM-frequency-and-d.patch \
+    file://0014-dts-cortadodeck-remap-mt6359-home-key-to-volume-down.patch \
 "

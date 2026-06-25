@@ -1,0 +1,42 @@
+From 848275db7977f86d8128a99cfb4da2b677c3fe06 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Mon, 1 Jun 2026 13:39:44 +0800
+Subject: [PATCH 1/2] dts: cortadodeck: adjust backlight PWM frequency and
+ default brightness
+
+---
+ arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+index f2b43f0309da..61219815b9d9 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+@@ -31,20 +31,20 @@ aliases {
+ 	/* for MIPI lcd */
+ 	backlight_lcd0: backlight-lcd0 {
+ 		compatible = "pwm-backlight";
+-		pwms = <&disp_pwm0 0 500000>;
++		pwms = <&disp_pwm0 0 50000>;
+ 		brightness-levels = <0 1023>;
+ 		num-interpolated-steps = <1023>;
+-		default-brightness-level = <576>;
++		default-brightness-level = <409>;
+ 		status = "okay";
+ 	};
+ 
+ 	/* for eDP panel */
+ 	backlight_lcd1: backlight-lcd1 {
+ 		compatible = "pwm-backlight";
+-		pwms = <&disp_pwm1 0 500000>;
++		pwms = <&disp_pwm1 0 50000>;
+ 		brightness-levels = <0 1023>;
+ 		num-interpolated-steps = <1023>;
+-		default-brightness-level = <576>;
++		default-brightness-level = <409>;
+ 		status = "disabled";
+ 	};
+ 
+-- 
+2.43.0
+
