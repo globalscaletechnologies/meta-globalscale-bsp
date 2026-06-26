@@ -16,4 +16,6 @@ SRC_URI:append:cortadodeck = " \
 	file://display-edp-fhd.dts \
 	file://display-dp.dts \
 	file://display-dpoc.dts \
+	file://display-dsi-fhd.dts \
+	file://ethernet-dis.dts \
 "
