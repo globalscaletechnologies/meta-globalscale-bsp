@@ -21,4 +21,10 @@ SRC_URI:append:cortadodeck = " \
     file://0012-arm64-dts-cortadodeck-configure-ACCDET-EINT-polarity.patch \
     file://0013-dts-cortadodeck-adjust-backlight-PWM-frequency-and-d.patch \
     file://0014-dts-cortadodeck-remap-mt6359-home-key-to-volume-down.patch \
+    file://0015-net-phy-an8801-update-LED-behavior-for-RJ45-indicato.patch \
+    file://0016-PCI-mediatek-gen3-Add-VCC-regulator-and-shutdown-pow.patch \
+    file://0017-dts-cortadodeck-Add-VCC-regulator-for-pcie.patch \
+    file://0018-dts-cortadodeck-remove-some-regulators-always-on-pro.patch \
+    file://0019-drm-panel-Add-support-for-Startek-kd050fhfid103-pane.patch \
+    file://0020-dts-cortadodeck-add-label-for-GT911-touchscreen-node.patch \
 "

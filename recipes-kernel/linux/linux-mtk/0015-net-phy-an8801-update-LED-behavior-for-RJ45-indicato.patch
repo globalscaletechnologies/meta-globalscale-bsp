@@ -1,0 +1,89 @@
+From 1fe01f85075df4bb288c59795b7c894cd54580a1 Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 25 Jun 2026 11:08:41 +0800
+Subject: [PATCH] net: phy: an8801: update LED behavior for RJ45 indicators
+
+Configure the RJ45 LEDs with the following behavior:
+- Green LED:
+  - Link up (10/100/1000 Mbps): solid on
+  - TX/RX activity: blink
+- Yellow LED:
+  - 1000 Mbps link: solid on
+  - 10/100 Mbps or link down: off
+
+Also update the LED polarity to active-low to match the Cortadodeck
+board's LED circuit.
+---
+ drivers/net/phy/an8801.c | 46 +++++++++++++++++++---------------------
+ 1 file changed, 22 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/net/phy/an8801.c b/drivers/net/phy/an8801.c
+index b85e5e4a1022..bbaae91ad046 100644
+--- a/drivers/net/phy/an8801.c
++++ b/drivers/net/phy/an8801.c
+@@ -97,24 +97,23 @@ MODULE_LICENSE("GPL");
+ #define RGMII_TXDELAY_FORCE_MODE    BIT(24)
+ #define AIR_CKO_OUT_DRV				0xF /* Available: 0x0~0xF (about 1.8V~2.5V) */
+ 
+-/* For reference only */
+-/* User-defined.B */
+-/* Link on(1G/100M/10M), no activity */
+-#define AIR_LED0_ON \
++/* For Coeradodeck Board */
++/* LED0 unused */
++#define AIR_LED0_ON     0
++#define AIR_LED0_BLK    0
++
++/* LED1 = Yellow = Link on(1000M) */
++#define AIR_LED1_ON     LED_ON_EVT_LINK_1000M
++#define AIR_LED1_BLK    0
++
++/* LED2 = Green = Link + Activity */
++#define AIR_LED2_ON \
+ 	(LED_ON_EVT_LINK_1000M | LED_ON_EVT_LINK_100M | LED_ON_EVT_LINK_10M)
+-#define AIR_LED0_BLK     (0x0)
+-/* No link on, activity(1G/100M/10M TX/RX) */
+-#define AIR_LED1_ON      (0x0)
+-#define AIR_LED1_BLK \
+-	(LED_BLK_EVT_1000M_TX | LED_BLK_EVT_1000M_RX | \
+-	LED_BLK_EVT_100M_TX | LED_BLK_EVT_100M_RX | \
+-	LED_BLK_EVT_10M_TX | LED_BLK_EVT_10M_RX)
+-/* Link on(100M/10M), activity(100M/10M TX/RX) */
+-#define AIR_LED2_ON      (LED_ON_EVT_LINK_100M | LED_ON_EVT_LINK_10M)
++
+ #define AIR_LED2_BLK \
+-	(LED_BLK_EVT_100M_TX | LED_BLK_EVT_100M_RX | \
+-	LED_BLK_EVT_10M_TX | LED_BLK_EVT_10M_RX)
+-/* User-defined.E */
++	(LED_BLK_EVT_1000M_TX | LED_BLK_EVT_1000M_RX | \
++	 LED_BLK_EVT_100M_TX  | LED_BLK_EVT_100M_RX  | \
++	 LED_BLK_EVT_10M_TX   | LED_BLK_EVT_10M_RX)
+ 
+ /* Invalid data */
+ #define INVALID_DATA            0xffffffff
+@@ -237,15 +236,14 @@ struct an8801r_priv {
+  *	GPIO2    <-> LED1,
+  *	GPIO3    <-> LED2,
+  */
+-/* User-defined.B */
++/* For Cortadodeck board */
+ static const struct AIR_LED_CFG_T led_cfg_dlt[MAX_LED_SIZE] = {
+-//   LED Enable,          GPIO,    LED Polarity,      LED ON,    LED Blink
+-	/* LED0 */
+-	{LED_ENABLE, AIR_LED_GPIO1, AIR_ACTIVE_LOW,  AIR_LED0_ON, AIR_LED0_BLK},
+-	/* LED1 */
+-	{LED_ENABLE, AIR_LED_GPIO2, AIR_ACTIVE_HIGH, AIR_LED1_ON, AIR_LED1_BLK},
+-	/* LED2 */
+-	{LED_ENABLE, AIR_LED_GPIO3, AIR_ACTIVE_HIGH, AIR_LED2_ON, AIR_LED2_BLK},
++	/* LED0 unused */
++	{LED_DISABLE, AIR_LED_GPIO1, AIR_ACTIVE_LOW, 0, 0},
++	/* LED1 = Yellow */
++	{LED_ENABLE, AIR_LED_GPIO2, AIR_ACTIVE_LOW, AIR_LED1_ON, AIR_LED1_BLK},
++	/* LED2 = Green */
++	{LED_ENABLE, AIR_LED_GPIO3, AIR_ACTIVE_LOW, AIR_LED2_ON, AIR_LED2_BLK},
+ };
+ 
+ static const u16 led_blink_cfg_dlt = AIR_LED_BLK_DUR_64M;
+-- 
+2.43.0
+

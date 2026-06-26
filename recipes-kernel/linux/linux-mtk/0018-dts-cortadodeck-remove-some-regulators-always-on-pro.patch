@@ -1,0 +1,57 @@
+From 294fc506442d5c533e90ee62a04c55bd10c12ede Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 25 Jun 2026 13:08:32 +0800
+Subject: [PATCH] dts: cortadodeck: remove some regulators always on property
+
+---
+ arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+index 1f080ebe94af..e5fee87078a9 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+@@ -159,7 +159,6 @@ vsd_3v3: vsd-3v3 {
+ 		regulator-max-microvolt = <3000000>;
+ 		gpio = <&iop3 3 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+-		regulator-always-on;
+ 	};
+ 
+ 	usb_p1_vbus: regulator-5 {
+@@ -169,7 +168,6 @@ usb_p1_vbus: regulator-5 {
+ 		regulator-max-microvolt = <5000000>;
+ 		gpio = <&pio 84 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+-		regulator-always-on;
+ 	};
+ 
+ 	usb_p2_vbus: regulator-6 {
+@@ -177,7 +175,7 @@ usb_p2_vbus: regulator-6 {
+ 		regulator-name = "usb_p2_vbus";
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+-		gpio = <&pio 85 0>;
++		gpio = <&pio 85 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
+ 
+@@ -207,7 +205,6 @@ vbus_hub: vbus_hub {
+ 		regulator-max-microvolt = <3300000>;
+ 		gpio = <&iop1 0 GPIO_ACTIVE_LOW>;
+ 		vin-supply = <&wifi_3v3en>;
+-		regulator-always-on;
+ 	};
+ 
+ 	touch0_fixed_3v3: regulator-9 {
+@@ -1363,6 +1360,7 @@ &xhci3 {
+ };
+ 
+ &xhci4 {
++	vusb33-supply = <&vbus_hub>;
+ 	wakeup-source;
+ 	status = "okay";
+ };
+-- 
+2.43.0
+

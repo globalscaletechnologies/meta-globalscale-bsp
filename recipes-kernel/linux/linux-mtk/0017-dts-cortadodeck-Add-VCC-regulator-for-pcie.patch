@@ -1,0 +1,32 @@
+From d307d5d3f4fe88403db338b4705b7a08cc1313ef Mon Sep 17 00:00:00 2001
+From: Jason Hung <jhung@globalscaletechnologies.com>
+Date: Thu, 25 Jun 2026 11:20:32 +0800
+Subject: [PATCH] dts: cortadodeck: Add VCC regulator for pcie
+
+---
+ arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+index 6d50a2bc725d..1f080ebe94af 100644
+--- a/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
++++ b/arch/arm64/boot/dts/mediatek/gti-cortadodeck.dts
+@@ -188,7 +188,6 @@ wifi_3v3en: regulator-7 {
+ 		regulator-max-microvolt = <3300000>;
+ 		gpio = <&iop1 1 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+-		regulator-always-on;
+ 	};
+ 
+ 	wcn_3v3_en: regulator-8 {
+@@ -1661,6 +1660,7 @@ &auxadc {
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pcie_default_pins>;
++	vcc-supply = <&wifi_3v3en>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.43.0
+
